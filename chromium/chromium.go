@@ -17,9 +17,23 @@ type VersionInfo struct {
 	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"` // /!\ This one is lowercase in JSON.
 }
 
+type Client struct {
+	HTTP http.Client
+}
+
+func NewClient() *Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+
+	return &Client{
+		HTTP: http.Client{
+			Transport: transport,
+		},
+	}
+}
+
 // Version pokes chromium's /json/version endpoint, and returns its response.
 // It will retry with exponential backoff until timeout is reached.
-func Version(ctx context.Context, address string) (versionInfo *VersionInfo, err error) {
+func (c *Client) Version(ctx context.Context, address string) (versionInfo *VersionInfo, err error) {
 	delay := 100 * time.Millisecond
 
 	for {
@@ -29,7 +43,7 @@ func Version(ctx context.Context, address string) (versionInfo *VersionInfo, err
 		default:
 		}
 
-		versionInfo, err = version(ctx, address)
+		versionInfo, err = c.version(ctx, address)
 		if err == nil {
 			return // All good
 		}
@@ -40,7 +54,7 @@ func Version(ctx context.Context, address string) (versionInfo *VersionInfo, err
 }
 
 // version pokes /json/version endpoint once.
-func version(ctx context.Context, address string) (*VersionInfo, error) {
+func (c *Client) version(ctx context.Context, address string) (*VersionInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
@@ -51,7 +65,7 @@ func version(ctx context.Context, address string) (*VersionInfo, error) {
 		return nil, fmt.Errorf("building request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
