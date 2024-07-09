@@ -18,8 +18,9 @@ import (
 )
 
 type Supervisor struct {
-	opts   Options
-	logger *slog.Logger
+	opts    Options
+	logger  *slog.Logger
+	cclient *chromium.Client
 	// sessions is a map from session ID to a cancel function that kills the session when called.
 	// Currently, crocochrome ensures that only one session is active at a time, by killing all other active sessions
 	// when a new one is creating (by traversing this map).
@@ -75,6 +76,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 	return &Supervisor{
 		opts:     opts.withDefaults(),
 		logger:   logger,
+		cclient:  chromium.NewClient(),
 		sessions: map[string]context.CancelFunc{},
 	}
 }
@@ -157,7 +159,7 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer versionCancel()
 
-	version, err := chromium.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
+	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
 	if err != nil {
 		logger.Error("could not get chromium info", "err", err)
 		s.delete(id) // We were not able to connect to chrome, the session is borked.
