@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -35,6 +36,12 @@ type Heartbeat struct {
 // Heartbeat does not run the script.
 func NewHeartbeat(t *testing.T) Heartbeat {
 	t.Helper()
+
+	// Lock ForkLock whenever we are writing to a file that will execute shortly after, to prevent its FD from leaking
+	// into a forked process and thus making exec fail with ETXBSY.
+	// https://github.com/golang/go/issues/22315
+	syscall.ForkLock.RLock()
+	defer syscall.ForkLock.RUnlock()
 
 	dir := t.TempDir()
 	scriptFile, err := os.OpenFile(filepath.Join(dir, "heartbeat.sh"), os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.FileMode(0o700))
