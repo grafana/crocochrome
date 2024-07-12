@@ -29,11 +29,11 @@ FROM alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367eff
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
-# Tini reaps leftover processes.
-RUN apk --no-cache add tini
-# Last known working: 126.0.6478.126-r0
-# Current at the time of writing this: 126.0.6478.182-r0
-RUN apk --no-cache add chromium-swiftshader
+# Renovate updates the pinned packages below.
+# The --repository arg is required for renovate to know which alpine repo it should look for updates in.
+# To keep the renovate regex simple, only keep one package installation per line.
+RUN apk --no-cache add --repository community tini=0.19.0-r3 && \
+  apk --no-cache add --repository community chromium-swiftshader=128.0.6613.119-r0
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
 # potential attack surface, we get rid of any file that has the setuid bit set, such as
