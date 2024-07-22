@@ -31,6 +31,9 @@ jobs:
         uses: grafana/shared-workflows/actions/push-to-gar-docker@main
         with:
           image_name: ${{ steps.repo.outputs.name }}
+          # In addition to tagged version, also push as the branch name. We don't use mutable tags in production, but
+          # it is useful for other repos to pull this in CI/CD tests.
           tags: |-
+            ${{ github.ref_name }}
             ${{ steps.repo.outputs.version }}
           push: true
