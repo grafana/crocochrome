@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/root/go/pkg \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
 
-FROM alpine:3.20.0 as setcapper
+FROM alpine:3.19.2 as setcapper
 
 RUN apk --no-cache add libcap
 
@@ -22,12 +22,17 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill+ep /usr/local/bin/crocochrome
 
-FROM alpine:3.20.0
+# WARNING: Do NOT upgrade alpine, as this release is the last one containing a working chromium.
+# 3.20.0 onwards do not support listening on addresses other than localhost, which is required for crocochrome to work.
+# https://issues.chromium.org/issues/327558594
+FROM alpine:3.19.2
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
 # Tini reaps leftover processes.
 RUN apk --no-cache add tini
+# Last known working: 126.0.6478.126-r0
+# Current at the time of writing this: 126.0.6478.182-r0
 RUN apk --no-cache add chromium-swiftshader
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
