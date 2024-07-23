@@ -90,7 +90,20 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 	}
 }
 
-// List returns a list of active session IDs.
+// Session returns an existing session with the given ID. If the session does not exist, either because it has expired
+// or because it has not been created, Session returns nil.
+func (s *Supervisor) Session(id string) *SessionInfo {
+	s.sessionsMtx.Lock()
+	defer s.sessionsMtx.Unlock()
+
+	if sess := s.sessions[id]; sess != nil {
+		return sess.info
+	}
+
+	return nil
+}
+
+// Sessions returns a list of active session IDs.
 // Crocochrome is currently wired to allow only one session at a time, by means of terminating all others when a new one
 // is created, but the design of its API try to be agnostic to this decision.
 func (s *Supervisor) Sessions() []string {
