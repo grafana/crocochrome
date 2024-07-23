@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/grafana/crocochrome"
@@ -63,8 +64,8 @@ func TestHTTP(t *testing.T) {
 			t.Fatalf("expected returned url to have 127.0.0.1 as host, got %q", response.ChromiumVersion.WebSocketDebuggerURL)
 		}
 
-		if parsedURL.Port() != "9222" {
-			t.Fatalf("expected returned url to have 9222 as port, got %q", response.ChromiumVersion.WebSocketDebuggerURL)
+		if !strings.HasPrefix(parsedURL.Path, "/proxy/") {
+			t.Fatalf("expected returned url to be replaced to /proxy, got %q", parsedURL.String())
 		}
 	})
 }

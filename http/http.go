@@ -3,9 +3,9 @@ package http
 import (
 	"encoding/json"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/grafana/crocochrome"
 	"github.com/koding/websocketproxy"
@@ -54,17 +54,15 @@ func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Chromium is guaranteed to run on the same host as this server, and we make it listen in 0.0.0.0. However,
-	// chromium always returns `localhost` as the URL host. Here we replace `localhost` in that URL with the host being
-	// used to reach this service.
-	newURL, err := replaceHost(session.ChromiumVersion.WebSocketDebuggerURL, r.Host)
-	if err != nil {
-		s.logger.Error("replacing chromium url with host header", "err", err)
-		rw.WriteHeader(http.StatusInternalServerError)
-		return
+	// Replace chromium's listen url with our proxy's for this session.
+	// Copy request's url to use the same scheme, host and port the client used to connect to us, as it is guaranteed
+	// that's correct.
+	proxyUrl := url.URL{
+		Scheme: "ws",
+		Host:   r.Host, // r.Host includes port if non-standard.
+		Path:   path.Join("proxy", session.ID),
 	}
-
-	session.ChromiumVersion.WebSocketDebuggerURL = newURL
+	session.ChromiumVersion.WebSocketDebuggerURL = proxyUrl.String()
 
 	rw.Header().Add("content-type", "application/json")
 	_ = json.NewEncoder(rw).Encode(session)
@@ -118,27 +116,4 @@ func (s *Server) Proxy(rw http.ResponseWriter, r *http.Request) {
 		},
 	}
 	wsp.ServeHTTP(rw, r)
-}
-
-// replaceHost returns a new url with its hostname replaced with host. The port is kept as it is.
-func replaceHost(urlStr, host string) (string, error) {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return "", err
-	}
-
-	_, port, err := net.SplitHostPort(parsedURL.Host)
-	if err != nil {
-		return "", err
-	}
-
-	// Get rid of the port if a port is present in host.
-	host, _, err = net.SplitHostPort(host)
-	if err != nil {
-		return "", err
-	}
-
-	parsedURL.Host = net.JoinHostPort(host, port)
-
-	return parsedURL.String(), nil
 }
