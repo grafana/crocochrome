@@ -26,7 +26,7 @@ type Supervisor struct {
 	// when a new one is creating (by traversing this map).
 	// Despite this decision of allowing only one session at a time, we wanted the design of Supervisor and its HTTP
 	// API to not be strongly coupled to this decision, hence the use of a map here instead of a single CancelFunc.
-	sessions    map[string]context.CancelFunc
+	sessions    map[string]*session
 	sessionsMtx sync.Mutex
 }
 
@@ -67,9 +67,18 @@ func (o Options) withDefaults() Options {
 	return o
 }
 
+// SessionInfo contains the ID and chromium info for a session.
 type SessionInfo struct {
-	ID              string                `json:"id"`
-	ChromiumVersion *chromium.VersionInfo `json:"chromiumVersion"`
+	ID              string               `json:"id"`
+	ChromiumVersion chromium.VersionInfo `json:"chromiumVersion"`
+}
+
+// session contains the session data associated with a session ID.
+type session struct {
+	// info is returned to clients when they provide an ID.
+	info *SessionInfo
+	// cancel is the CancelFunc for this session, called on Delete and when the session times out.
+	cancel context.CancelFunc
 }
 
 func New(logger *slog.Logger, opts Options) *Supervisor {
@@ -77,7 +86,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 		opts:     opts.withDefaults(),
 		logger:   logger,
 		cclient:  chromium.NewClient(),
-		sessions: map[string]context.CancelFunc{},
+		sessions: map[string]*session{},
 	}
 }
 
@@ -96,11 +105,11 @@ func (s *Supervisor) Sessions() []string {
 	return ids
 }
 
-// Session creates a new browser session, and returns its information.
+// Create creates a new browser session, and returns its information.
 // Currently, creating a new session will terminate other existing ones, if present. Clients should not rely on this
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
-func (s *Supervisor) Session() (SessionInfo, error) {
+func (s *Supervisor) Create() (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -110,7 +119,9 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 	logger := s.logger.With("sessionID", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
-	s.sessions[id] = cancel
+	sess := &session{cancel: cancel}
+
+	s.sessions[id] = sess
 
 	context.AfterFunc(ctx, func() {
 		// The session context may be cancelled by calling s.Delete, but may also timeout naturally. Here we call
@@ -183,10 +194,14 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 		return SessionInfo{}, err
 	}
 
-	return SessionInfo{
+	si := SessionInfo{
 		ID:              id,
-		ChromiumVersion: version,
-	}, nil
+		ChromiumVersion: *version,
+	}
+
+	sess.info = &si
+
+	return si, nil
 }
 
 // Delete cancels a session's context and removes it from the map.
@@ -200,9 +215,9 @@ func (s *Supervisor) Delete(sessionID string) bool {
 // delete cancels a session's context and removes it from the map, without locking the mutex.
 // It must be used only inside functions that already grab the lock.
 func (s *Supervisor) delete(sessionID string) bool {
-	if cancelSession, found := s.sessions[sessionID]; found {
+	if sess := s.sessions[sessionID]; sess != nil {
 		s.logger.Debug("cancelling context and deleting session", "sessionID", sessionID)
-		cancelSession()
+		sess.cancel()
 		delete(s.sessions, sessionID)
 		return true
 	}
