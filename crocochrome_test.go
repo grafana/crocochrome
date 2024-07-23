@@ -24,7 +24,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		session, err := cc.Session()
+		session, err := cc.Create()
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
@@ -64,7 +64,7 @@ func TestCrocochrome(t *testing.T) {
 			port := testutil.HTTPInfo(t, testutil.InternalServerErrorHandler)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-			_, err := cc.Session()
+			_, err := cc.Create()
 			if err == nil {
 				t.Fatalf("expected an error, got: %v", err)
 			}
@@ -78,7 +78,7 @@ func TestCrocochrome(t *testing.T) {
 			hb := testutil.NewHeartbeat(t)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: "0"})
 
-			_, err := cc.Session()
+			_, err := cc.Create()
 			if err == nil {
 				t.Fatalf("expected an error, got: %v", err)
 			}
@@ -94,7 +94,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		sess, err := cc.Session()
+		sess, err := cc.Create()
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
@@ -117,14 +117,14 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		sess1, err := cc.Session()
+		sess1, err := cc.Create()
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
 
 		hb.AssertAliveDead(1, 0)
 
-		_, err = cc.Session()
+		_, err = cc.Create()
 		if err != nil {
 			t.Fatalf("creating second session: %v", err)
 		}
@@ -145,7 +145,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
 
-		_, err := cc.Session()
+		_, err := cc.Create()
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}

@@ -45,7 +45,7 @@ func (s *Server) List(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
-	session, err := s.supervisor.Session()
+	session, err := s.supervisor.Create()
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		_, _ = rw.Write([]byte(err.Error()))
