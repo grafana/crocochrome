@@ -26,7 +26,7 @@ type Supervisor struct {
 	// when a new one is creating (by traversing this map).
 	// Despite this decision of allowing only one session at a time, we wanted the design of Supervisor and its HTTP
 	// API to not be strongly coupled to this decision, hence the use of a map here instead of a single CancelFunc.
-	sessions    map[string]*session
+	sessions    map[string]session
 	sessionsMtx sync.Mutex
 }
 
@@ -86,7 +86,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 		opts:     opts.withDefaults(),
 		logger:   logger,
 		cclient:  chromium.NewClient(),
-		sessions: map[string]*session{},
+		sessions: map[string]session{},
 	}
 }
 
@@ -96,7 +96,7 @@ func (s *Supervisor) Session(id string) *SessionInfo {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
-	if sess := s.sessions[id]; sess != nil {
+	if sess, found := s.sessions[id]; found {
 		return sess.info
 	}
 
@@ -132,14 +132,15 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 	logger := s.logger.With("sessionID", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
-	sess := &session{cancel: cancel}
 
-	s.sessions[id] = sess
-
+	// Register a function that removes the session from the map when the context is cancelled.
+	// It is okay to register this before adding the session to the map as s.Delete is a no-op if the session does not
+	// exist.
 	context.AfterFunc(ctx, func() {
-		// The session context may be cancelled by calling s.Delete, but may also timeout naturally. Here we call
-		// s.Delete to ensure that the session is removed from the map.
-		// If the session is deleted by s.Delete, then it will be called again by this function, but that is okay.
+		// The session context may be cancelled by calling s.Delete, but may also timeout naturally. This function calls
+		// s.Delete to ensure we remove the session from the map on the natural timeout case, which means that s.Delete
+		// will be called a second time by this function if called manually. This is fine, as s.Delete is a no-op if the
+		// session has already been removed.
 		logger.Debug("context cancelled, deleting session")
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
 	})
@@ -185,8 +186,10 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 
 	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
 	if err != nil {
-		logger.Error("could not get chromium info", "err", err)
-		s.delete(id) // We were not able to connect to chrome, the session is borked.
+		// We were not able to connect to chrome, the session is toast.
+		logger.Error("could not get chromium info, cancelling session", "err", err)
+		cancel()
+
 		return SessionInfo{}, err
 	}
 
@@ -195,7 +198,10 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		ChromiumVersion: *version,
 	}
 
-	sess.info = &si
+	s.sessions[id] = session{
+		cancel: cancel,
+		info:   &si,
+	}
 
 	return si, nil
 }
@@ -211,7 +217,7 @@ func (s *Supervisor) Delete(sessionID string) bool {
 // delete cancels a session's context and removes it from the map, without locking the mutex.
 // It must be used only inside functions that already grab the lock.
 func (s *Supervisor) delete(sessionID string) bool {
-	if sess := s.sessions[sessionID]; sess != nil {
+	if sess, found := s.sessions[sessionID]; found {
 		s.logger.Debug("cancelling context and deleting session", "sessionID", sessionID)
 		sess.cancel()
 		delete(s.sessions, sessionID)
