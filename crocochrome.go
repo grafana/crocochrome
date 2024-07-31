@@ -217,6 +217,16 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 			logger.Error("running chromium", "err", err)
 			logger.Error("chromium output", "stdout", stdout.String())
 			logger.Error("chromium output", "stderr", stderr.String())
+
+			if ps := cmd.ProcessState; ps != nil {
+				logger.Debug(
+					"chromium process finished",
+					"state", ps.String(),
+					"exitCode", ps.ExitCode(),
+					"rss", ps.SysUsage().(*syscall.Rusage).Maxrss,
+				)
+			}
+
 			return
 		}
 
