@@ -136,6 +136,18 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 			// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 			// http://crbug.com/715363
 			"--disable-dev-shm-usage",
+
+			// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
+			// needed:
+			"--disable-breakpad", "--disable-crash-reporter", // Disable crash reporting.
+			"--disable-3d-apis", // Disable webGL and the likes.
+			"--disable-audio-input", "--disable-audio-output",
+			"--disable-default-apps", // Disables installation of default apps on first run.
+			"--disable-extensions",
+			"--disable-file-system",
+			"--disable-first-run-ui",
+			"--disable-notifications",
+			"--disable-smooth-scrolling", // No need to burn CPU on this.
 		)
 		cmd.Env = []string{}
 		cmd.Stdout = stdout
