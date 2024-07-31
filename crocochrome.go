@@ -120,6 +120,7 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
 	})
 
+	// Launch chromium and wait for it to finish asynchronously.
 	go func() {
 		logger.Debug("starting session")
 		stdout := &bytes.Buffer{}
@@ -127,10 +128,14 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 
 		cmd := exec.CommandContext(ctx,
 			s.opts.ChromiumPath,
+			// The following flags have been tested to be required:
 			"--headless",
 			"--remote-debugging-address=0.0.0.0",
 			"--remote-debugging-port="+s.opts.ChromiumPort,
-			"--no-sandbox",
+			"--no-sandbox", // We run a single instance as nobody:nobody, making this redundant.
+			// Containers often have a small /dev/shm, causing crashes if chromium uses it.
+			// http://crbug.com/715363
+			"--disable-dev-shm-usage",
 		)
 		cmd.Env = []string{}
 		cmd.Stdout = stdout
