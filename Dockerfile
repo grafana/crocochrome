@@ -20,7 +20,7 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # The following capabilities are used by sm-k6-runner to sandbox the k6 binary. More details about what each cap is used
 # for can be found in /sandbox/sandbox.go.
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
-RUN setcap cap_setuid,cap_setgid,cap_kill+ep /usr/local/bin/crocochrome
+RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
 # WARNING: Do NOT upgrade alpine, as this release is the last one containing a working chromium.
 # 3.20.0 onwards do not support listening on addresses other than localhost, which is required for crocochrome to work.
