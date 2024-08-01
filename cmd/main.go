@@ -16,7 +16,13 @@ func main() {
 
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
-		UserGroup:    65534, // Id for nobody user and group on alpine.
+		// Id for nobody user and group on alpine.
+		UserGroup: 65534,
+		// In production we mount an emptyDir here, as opposed to /tmp, and configure chromium to write everything in
+		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
+		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
+		// because we told it to.
+		TempDir: "/chromium-tmp",
 	})
 
 	server := crocohttp.New(logger, supervisor)
