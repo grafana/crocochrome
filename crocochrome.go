@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -43,6 +44,8 @@ type Options struct {
 	// UserGroup allows running chromium as a different user and group. The same value will be used for both.
 	// If UserGroup is 0, chromium will be run as the current user.
 	UserGroup int
+	// TempDir is the path to a writable directory where folders for chromium processes will be stored.
+	TempDir string
 }
 
 const (
@@ -62,6 +65,10 @@ func (o Options) withDefaults() Options {
 
 	if o.SessionTimeout == 0 {
 		o.SessionTimeout = defaultSessionTimeout
+	}
+
+	if o.TempDir == "" {
+		o.TempDir = os.TempDir()
 	}
 
 	return o
@@ -126,6 +133,20 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
+		tmpDir, err := s.mkdirTemp()
+		if err != nil {
+			logger.Error("creating temporary directory", "err", err)
+			return
+		}
+
+		defer func() {
+			// Clean up files after chromium exits.
+			err := os.RemoveAll(tmpDir)
+			if err != nil {
+				panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
+			}
+		}()
+
 		cmd := exec.CommandContext(ctx,
 			s.opts.ChromiumPath,
 			// The following flags have been tested to be required:
@@ -149,7 +170,12 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 			"--disable-notifications",
 			"--disable-smooth-scrolling", // No need to burn CPU on this.
 		)
-		cmd.Env = []string{}
+		cmd.Env = []string{
+			// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
+			// we created for this session, because /tmp is read-only in production.
+			// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
+			"TMPDIR=" + tmpDir,
+		}
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		if s.opts.UserGroup != 0 {
@@ -161,7 +187,7 @@ func (s *Supervisor) Session() (SessionInfo, error) {
 			}
 		}
 
-		err := cmd.Run()
+		err = cmd.Run()
 		if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
 			logger.Error("running chromium", "err", err)
 			logger.Error("chromium output", "stdout", stdout.String())
@@ -217,6 +243,25 @@ func (s *Supervisor) killExisting() {
 		s.logger.Error("existing session found, killing", "sessionID", id)
 		s.delete(id)
 	}
+}
+
+func (s *Supervisor) mkdirTemp() (string, error) {
+	tmpDir, err := os.MkdirTemp(s.opts.TempDir, "")
+	if err != nil {
+		return "", err
+	}
+
+	if s.opts.UserGroup == 0 {
+		// No chowning necessary.
+		return tmpDir, nil
+	}
+
+	err = os.Chown(tmpDir, s.opts.UserGroup, s.opts.UserGroup)
+	if err != nil {
+		return "", fmt.Errorf("chowning temporary dir: %w", err)
+	}
+
+	return tmpDir, nil
 }
 
 // randString returns 12 random hex characters.
