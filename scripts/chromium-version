@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# vim:ft=bash
+
+# This script parses the chromium version being installed on a given dockerfile, assuming it is in the form of:
+# chromium-swiftshader=VERSION
+# It exits with non-zero code if no version could be parsed.
+
+set -eo pipefail
+
+if [[ -z "$1" ]]; then
+  echo "Usage: $0 <path/to/Dockerfile>"
+  exit 1
+fi
+
+version=$(sed -nr 's/.*chromium-swiftshader=([0-9A-Za-z+._-]+).*/\1/p' "$1")
+if [[ -z $version ]]; then
+  exit 1
+fi
+
+echo "$version"
