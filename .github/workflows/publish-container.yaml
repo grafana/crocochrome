@@ -24,6 +24,7 @@ jobs:
         run: |-
           echo "name=$(basename '${{ github.repository }}')" >> $GITHUB_OUTPUT
           echo "version=$(./scripts/version)" >> $GITHUB_OUTPUT
+          echo "chromium-version=$(./scripts/chromium-version Dockerfile)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
       - name: Login to Google Artifact Registry
         uses: grafana/shared-workflows/actions/login-to-gar@main
@@ -32,5 +33,5 @@ jobs:
         with:
           image_name: ${{ steps.repo.outputs.name }}
           tags: |-
-            ${{ steps.repo.outputs.version }}
+            ${{ steps.repo.outputs.version }}+chromium-${{ steps.repo.outputs.chromium-version }}
           push: true
