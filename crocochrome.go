@@ -293,7 +293,10 @@ func (s *Supervisor) killExisting() {
 func (s *Supervisor) mkdirTemp() (string, error) {
 	_, err := os.Stat(s.opts.TempDir)
 	if errors.Is(err, fs.ErrNotExist) {
-		s.logger.Warn("Specified temp dir does not exist, is it mounted? Falling back to creating it.")
+		s.logger.Warn(
+			"Specified TempDir does not exist, is it mounted? Falling back to creating it.",
+			"TempDir", s.opts.TempDir,
+		)
 		err = os.MkdirAll(s.opts.TempDir, 0o755) // 700 would not allow other users to descend into subdirectories.
 		if err != nil {
 			return "", fmt.Errorf("tmpdir does not exist and couldn't be created: %w", err)
