@@ -54,11 +54,6 @@ const (
 	defaultSessionTimeout = 5 * time.Minute
 )
 
-const (
-	nobodyUIDAlpine = 65534
-	nobodyGIDAlpine = 65534
-)
-
 func (o Options) withDefaults() Options {
 	if o.ChromiumPort == "" {
 		o.ChromiumPort = defaultChromiumPort
@@ -207,8 +202,8 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		if s.opts.UserGroup != 0 {
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Credential: &syscall.Credential{
-					Uid: nobodyUIDAlpine,
-					Gid: nobodyGIDAlpine,
+					Uid: uint32(s.opts.UserGroup),
+					Gid: uint32(s.opts.UserGroup),
 				},
 			}
 		}
