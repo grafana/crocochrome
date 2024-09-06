@@ -12,6 +12,8 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -159,19 +161,12 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
-		tmpDir, err := s.mkdirTemp()
+		dirs, err := s.sessionDirs()
+		defer dirs.mustRemove() // This is safe to call this on the zero-value of sessionDirs.
 		if err != nil {
-			logger.Error("creating temporary directory", "err", err)
+			logger.Error("creating temporary directory tree", "err", err)
 			return
 		}
-
-		defer func() {
-			// Clean up files after chromium exits.
-			err := os.RemoveAll(tmpDir)
-			if err != nil {
-				panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
-			}
-		}()
 
 		cmd := exec.CommandContext(ctx,
 			s.opts.ChromiumPath,
@@ -196,12 +191,11 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 			"--disable-notifications",
 			"--disable-smooth-scrolling", // No need to burn CPU on this.
 		)
-		cmd.Env = []string{
-			// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
-			// we created for this session, because /tmp is read-only in production.
-			// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
-			"TMPDIR=" + tmpDir,
-		}
+		// Chromium uses theses env vars to figure where to write files it needs to, such as caches, fifos, etc. We want
+		// these to be the directories created for this session specifically and not the defaults (such as /tmp), so we
+		// can make those defaults readonly in production and get verbose failures if they are used for things we are
+		// not overriding.
+		cmd.Env = dirs.env()
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		if s.opts.UserGroup != 0 {
@@ -290,7 +284,9 @@ func (s *Supervisor) killExisting() {
 	}
 }
 
-func (s *Supervisor) mkdirTemp() (string, error) {
+// sessionDirs creates a tree of directories rooted in opts.TempDir that this chromium session can use for writing.
+// Chromium expects some folders to be writable, that being the reason for us doing this.
+func (s *Supervisor) sessionDirs() (sessionDirs, error) {
 	_, err := os.Stat(s.opts.TempDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		s.logger.Warn(
@@ -299,26 +295,108 @@ func (s *Supervisor) mkdirTemp() (string, error) {
 		)
 		err = os.MkdirAll(s.opts.TempDir, 0o755) // 700 would not allow other users to descend into subdirectories.
 		if err != nil {
-			return "", fmt.Errorf("tmpdir does not exist and couldn't be created: %w", err)
+			return sessionDirs{}, fmt.Errorf("tmpdir does not exist and couldn't be created: %w", err)
 		}
 	}
 
-	tmpDir, err := os.MkdirTemp(s.opts.TempDir, "")
+	dirs := sessionDirs{}
+	err = dirs.create(s.opts.TempDir)
 	if err != nil {
-		return "", err
+		return sessionDirs{}, err
 	}
 
 	if s.opts.UserGroup == 0 {
 		// No chowning necessary.
-		return tmpDir, nil
+		return dirs, nil
 	}
 
-	err = os.Chown(tmpDir, s.opts.UserGroup, s.opts.UserGroup)
+	err = dirs.chown(s.opts.UserGroup, s.opts.UserGroup)
 	if err != nil {
-		return "", fmt.Errorf("chowning temporary dir: %w", err)
+		return sessionDirs{}, fmt.Errorf("chowning temporary dirs: %w", err)
 	}
 
-	return tmpDir, nil
+	return dirs, nil
+}
+
+// sessionDir conveniently stores directories chromium needs to write to.
+type sessionDirs struct {
+	// base is the root of the temporary session dirs. Other directories are subdirs to this one.
+	base string
+	// subdirs contains the full path to subdirectories used by chromium for storing different files. They are identified by
+	// the environment variable chromium uses to configure them.
+	subdirs map[string]string
+}
+
+// createSubdirs creates a base directory inside tmpdir, and all required subdirectories inside base.
+func (s *sessionDirs) create(tmpdir string) error {
+	if s.base != "" {
+		return errors.New("sessionDirs were already initialized")
+	}
+
+	base, err := os.MkdirTemp(tmpdir, "")
+	if err != nil {
+		return fmt.Errorf("creating base session dir: %w", err)
+	}
+
+	s.base = base
+	s.subdirs = map[string]string{}
+
+	// Range over the names of the subdirectories and the corresponding env var they will be used for.
+	for envName, subdir := range map[string]string{
+		"XDG_CONFIG_HOME": "config",
+		"XDG_CACHE_HOME":  "cache",
+		"TMPDIR":          "tmp",
+	} {
+		dir := filepath.Join(s.base, subdir)
+		err := os.Mkdir(dir, 0o700) // Hack: 0755 works both changing users and not doing so.
+		if err != nil {
+			return fmt.Errorf("creating %q subdir: %w", subdir, err)
+		}
+
+		s.subdirs[envName] = dir
+	}
+
+	return nil
+}
+
+// chown changes ownership of all dirs to the specified user and group.
+func (s *sessionDirs) chown(user int, group int) error {
+	baseAndSubs := []string{s.base}
+	for _, dir := range s.subdirs {
+		baseAndSubs = append(baseAndSubs, dir)
+	}
+
+	for _, dir := range baseAndSubs {
+		err := os.Chown(dir, user, group)
+		if err != nil {
+			return fmt.Errorf("chowning %q: %w", dir, err)
+		}
+	}
+
+	return nil
+}
+
+// env returns a list of key=value environment variables that makes chromium use the paths contained in sessionDirs.
+func (s *sessionDirs) env() []string {
+	envs := make([]string, 0, len(s.subdirs))
+	for envName, subdir := range s.subdirs {
+		envs = append(envs, strings.Join([]string{envName, subdir}, "="))
+	}
+
+	return envs
+}
+
+// mustRemove removes the base dir and everything inside it, and panics if an error occurs in the process.
+// mustRemove is a noop for an empty sessionDirs.
+func (s *sessionDirs) mustRemove() {
+	if s.base == "" {
+		return
+	}
+
+	err := os.RemoveAll(s.base)
+	if err != nil {
+		panic(fmt.Errorf("removing session dirs: %w", err))
+	}
 }
 
 // randString returns 12 random hex characters.
