@@ -14,6 +14,14 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	chromiumVersion, err := os.ReadFile("/etc/chromium-version")
+	if err != nil {
+		logger.Error("reading chromium version")
+		return
+	}
+
+	logger.Info("Starting crocochrome", "chromiumVersion", string(chromiumVersion))
+
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
 		// Id for nobody user and group on alpine.
@@ -29,7 +37,7 @@ func main() {
 
 	const address = ":8080"
 	logger.Info("Starting HTTP server", "address", address)
-	err := http.ListenAndServe(address, server)
+	err = http.ListenAndServe(address, server)
 	if err != nil {
 		logger.Error("Setting up HTTP listener", "err", err)
 	}
