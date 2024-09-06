@@ -34,6 +34,7 @@ RUN apk --no-cache add tini
 # Last known working: 126.0.6478.126-r0
 # Current at the time of writing this: 126.0.6478.182-r0
 RUN apk --no-cache add chromium-swiftshader
+RUN chromium --version > /etc/chromium-version
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
 # potential attack surface, we get rid of any file that has the setuid bit set, such as
