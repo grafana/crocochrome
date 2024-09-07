@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/root/go/pkg \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
 
-FROM alpine:3.20.2 as setcapper
+FROM alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d as setcapper
 
 RUN apk --no-cache add libcap
 
@@ -25,7 +25,7 @@ RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+
 # WARNING: Do NOT upgrade alpine, as this release is the last one containing a working chromium.
 # 3.20.0 onwards do not support listening on addresses other than localhost, which is required for crocochrome to work.
 # https://issues.chromium.org/issues/327558594
-FROM alpine:3.20.2
+FROM alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
