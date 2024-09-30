@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/grafana/crocochrome/chromium"
+	"github.com/grafana/crocochrome/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Supervisor struct {
@@ -30,6 +32,7 @@ type Supervisor struct {
 	// API to not be strongly coupled to this decision, hence the use of a map here instead of a single CancelFunc.
 	sessions    map[string]session
 	sessionsMtx sync.Mutex
+	metrics     *metrics.SupervisorMetrics
 }
 
 type Options struct {
@@ -47,6 +50,8 @@ type Options struct {
 	UserGroup int
 	// TempDir is the path to a writable directory where folders for chromium processes will be stored.
 	TempDir string
+	// Registry is a prometheus registerer for telemetry.
+	Registry prometheus.Registerer
 }
 
 const (
@@ -67,6 +72,10 @@ func (o Options) withDefaults() Options {
 		o.TempDir = os.TempDir()
 	}
 
+	if o.Registry == nil {
+		o.Registry = prometheus.NewRegistry() // Empty, unused.
+	}
+
 	return o
 }
 
@@ -85,11 +94,14 @@ type session struct {
 }
 
 func New(logger *slog.Logger, opts Options) *Supervisor {
+	opts = opts.withDefaults()
+
 	return &Supervisor{
-		opts:     opts.withDefaults(),
+		opts:     opts,
 		logger:   logger,
 		cclient:  chromium.NewClient(),
 		sessions: map[string]session{},
+		metrics:  metrics.Supervisor(opts.Registry),
 	}
 }
 
@@ -207,6 +219,11 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 				},
 			}
 		}
+
+		created := time.Now()
+		defer func() {
+			s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
+		}()
 
 		err = cmd.Run()
 		if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
