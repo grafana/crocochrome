@@ -260,7 +260,7 @@ func (s *Supervisor) Create(traceCtx context.Context) (SessionInfo, error) {
 		logger.Debug("chromium output", "stderr", stderr.String())
 	}()
 
-	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
+	versionCtx, versionCancel := context.WithTimeout(traceCtx, 2*time.Second)
 	defer versionCancel()
 
 	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
