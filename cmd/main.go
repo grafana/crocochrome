@@ -64,12 +64,12 @@ func main() {
 	var handler http.Handler = crocohttp.New(logger, supervisor)
 	handler = metrics.InstrumentHTTP(registry, handler)
 	handler = otelhttp.NewHandler(
-		handler,
+		// Instead of using a span name formatter, this middleware sets the span name using the mux pattern.
+		spanNameFromPattern(handler),
 		"http",
 		otelhttp.WithTracerProvider(tp),
 		// Consider all endpoints private. This enables propagating traceIDs from clients.
 		otelhttp.WithPublicEndpointFn(func(r *http.Request) bool { return false }),
-		// Do not use a span name formatter, the http serves names their own spans.
 		otelhttp.WithPropagators(propagation.TraceContext{}),
 	)
 
@@ -109,4 +109,17 @@ func tracerProvider(ctx context.Context) (trace.TracerProvider, error) {
 		sdktrace.WithBatcher(te),
 		sdktrace.WithResource(res),
 	), nil
+}
+
+// spanNameFromPattern is a simple middleware that sets the name of the span in the request context to the pattern used
+// to match this request.
+// This has to be done _after_ http.ServeMux has figured out the route.
+func spanNameFromPattern(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Call handler first, so http.ServeMux can populate r.Pattern
+		next.ServeHTTP(w, r)
+		// Set span name after the fact. As long as this middleware is used within otelhttp.Handler, the span should
+		// still be open and thus renameable.
+		trace.SpanFromContext(r.Context()).SetName(r.Pattern)
+	})
 }
