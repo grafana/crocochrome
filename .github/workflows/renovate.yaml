@@ -39,7 +39,7 @@ jobs:
         uses: renovatebot/github-action@dd4d265eb8646cd04fc5f86ff8bc8d496d75a251 # v40.2.8
         with:
           # Renovate updates the line below. Please keep its formatting as it is.
-          renovate-version: 37.420.1
+          renovate-version: 38.67.1
           token: ${{ steps.app-token.outputs.token }}
           # Pass to renovate the env vars used to configure host auth:
           env-regex: '^(RENOVATE_|GO_)'
