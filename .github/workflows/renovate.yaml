@@ -5,42 +5,48 @@ on:
   workflow_dispatch:
 jobs:
   renovate:
+    # These permissions are needed to assume roles from Github's OIDC.
     permissions:
       contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Get renovate app secrets
+        uses: grafana/shared-workflows/actions/get-vault-secrets@main
+        with:
+          common_secrets: |
+            GRAFANA_RENOVATE_APP_ID=grafana-renovate-app:app-id
+            GRAFANA_RENOVATE_APP_PEM=grafana-renovate-app:private-key
+      - uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+        id: app-token
+        with:
+          app-id: ${{ env.GRAFANA_RENOVATE_APP_ID }}
+          private-key: ${{ env.GRAFANA_RENOVATE_APP_PEM }}
+      # The generated token above is disposable, but app id and pem are not. For security hygiene, clear them from
+      # the environment so subsequent steps no longer have access to them.
+      - name: Clear env vars
+        run: |-
+          echo "GRAFANA_RENOVATE_APP_ID=" >> $GITHUB_ENV
+          echo "GRAFANA_RENOVATE_APP_PEM=" >> $GITHUB_ENV
+      - name: Ensure env vars are unset
+        run: |-
+          [[ "$GRAFANA_RENOVATE_APP_PEM" = "" ]] && [[ "$GRAFANA_RENOVATE_APP_PEM" = "" ]] || (echo "Secrets found in shell envinronment" && exit 1)
+          [[ -z "${{ env.GRAFANA_RENOVATE_APP_ID }}" ]] || (echo "Secrets found in github env context" && exit 1)
       - name: Checkout Code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: Generate token
-        id: generate-token
-        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a #v2.1.0
-        with:
-          revoke: true
-          app_id: ${{ secrets.RENOVATEGRAFANA_ID }}
-          private_key: ${{ secrets.RENOVATEGRAFANA_PEM }}
       - name: Self-hosted Renovate
         uses: renovatebot/github-action@dd4d265eb8646cd04fc5f86ff8bc8d496d75a251 # v40.2.8
         with:
           # Renovate updates the line below. Please keep its formatting as it is.
           renovate-version: 37.420.1
-          token: '${{ steps.generate-token.outputs.token }}'
+          token: ${{ steps.app-token.outputs.token }}
+          # Pass to renovate the env vars used to configure host auth:
+          env-regex: '^(RENOVATE_|GO_)'
         env:
-          GITHUB_COM_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
           LOG_LEVEL: debug
-          RENOVATE_DETECT_HOST_RULES_FROM_ENV: true
           RENOVATE_PLATFORM: github
           RENOVATE_REPOSITORIES: ${{ github.repository }}
-          RENOVATE_USERNAME: GrafanaRenovateBot
-          GO_GITHUB_COM_HOSTTYPE: go
-          GO_GITHUB_COM_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
-          GO_GITHUB_COM_GRAFANA_HOSTTYPE: go
-          GO_GITHUB_COM_GRAFANA_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
-          GO_HTTPS___GITHUB_COM_HOSTTYPE: go
-          GO_HTTPS___GITHUB_COM_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
-          GO_HTTPS___GITHUB_COM_GRAFANA_HOSTTYPE: go
-          GO_HTTPS___GITHUB_COM_GRAFANA_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
-          GO_HTTPS_GITHUB_COM_HOSTTYPE: go
-          GO_HTTPS_GITHUB_COM_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
-          GO_HTTPS_GITHUB_COM_GRAFANA_HOSTTYPE: go
-          GO_HTTPS_GITHUB_COM_GRAFANA_TOKEN: ${{ secrets.GRAFANABOT_PAT }}
+          # Configure renovate to also use the token for go get commands.
+          RENOVATE_DETECT_HOST_RULES_FROM_ENV: "true"
+          GO_GITHUB_COM_TOKEN: ${{ steps.app-token.outputs.token }}
