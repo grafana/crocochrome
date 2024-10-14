@@ -19,6 +19,7 @@ import (
 	"github.com/grafana/crocochrome/chromium"
 	"github.com/grafana/crocochrome/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Supervisor struct {
@@ -99,7 +100,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 	return &Supervisor{
 		opts:     opts,
 		logger:   logger,
-		cclient:  chromium.NewClient(),
+		cclient:  &chromium.Client{},
 		sessions: map[string]session{},
 		metrics:  metrics.Supervisor(opts.Registry),
 	}
@@ -137,7 +138,8 @@ func (s *Supervisor) Sessions() []string {
 // Currently, creating a new session will terminate other existing ones, if present. Clients should not rely on this
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
-func (s *Supervisor) Create() (SessionInfo, error) {
+// Context passed to this function is used only for tracing. Cancelling it will not destroy the session created by it.
+func (s *Supervisor) Create(traceCtx context.Context) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -146,6 +148,7 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 	id := randString()
 	logger := s.logger.With("sessionID", id)
 
+	// Create a new context for the session with its own lifecycle.
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
 
 	// Register a function that removes the session from the map when the context is cancelled.
@@ -162,7 +165,15 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 
 	// Launch chromium and wait for it to finish asynchronously.
 	go func() {
-		logger.Debug("starting session")
+		logger.Debug("starting chromium")
+
+		ctx, chromiumSpan := trace.SpanFromContext(traceCtx).TracerProvider().Tracer("").Start(ctx, "chromium run")
+		defer chromiumSpan.End()
+
+		// Chromium run span will outlive the span present in tracingCtx, so we cannot create a child span. Instead, we
+		// create a fresh span and link the previous span to it.
+		chromiumSpan.AddLink(trace.LinkFromContext(traceCtx))
+
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
 
@@ -227,6 +238,8 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 
 		err = cmd.Run()
 		if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
+			chromiumSpan.RecordError(err)
+
 			logger.Error("running chromium", "err", err)
 			logger.Error("chromium output", "stdout", stdout.String())
 			logger.Error("chromium output", "stderr", stderr.String())
@@ -247,7 +260,7 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		logger.Debug("chromium output", "stderr", stderr.String())
 	}()
 
-	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
+	versionCtx, versionCancel := context.WithTimeout(traceCtx, 2*time.Second)
 	defer versionCancel()
 
 	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
