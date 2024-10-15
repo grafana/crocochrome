@@ -6,6 +6,7 @@
   ],
 
   "branchPrefix": "grafanarenovatebot/",
+  "commitMessagePrefix": "Chore: ",
   // Used when renovate runs as a github app.
   // https://docs.renovatebot.com/configuration-options/#platformcommit
   // Setting platformCommit to "enabled", as required by Grafana policy, seems to make renovate think all PRs are modified,
@@ -14,18 +15,40 @@
   "platformCommit": "enabled",
   "dependencyDashboard": false,
   "forkProcessing": "disabled",
+  "rebaseWhen": "behind-base-branch",
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 10,
+  "branchConcurrentLimit": 10,
+
+  "enabledManagers": ["custom.regex", "gomod"],
+
+  "labels": ["dependencies"],
+
+  "gomod": {
+    "enabled": true
+  },
 
   "postUpdateOptions": [
     "gomodTidyE"
   ],
 
-  "packageRules" : [
+  "packageRules": [
     {
       // Non-versioned go modules are noisy, with almost daily updates. We throttle them a bit.
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["digest"],
       "schedule": "before 8am on monday every 2 weeks",
     },
+    {
+      "matchManagers": ["gomod"],
+      "matchPackageNames": "github.com/prometheus/*",
+      "groupName": "prometheus-go"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchPackageNames": "go.opentelemetry.io/**",
+      "groupName": "otel-go"
+    }
   ],
 
   "customManagers": [
@@ -35,11 +58,12 @@
       "depNameTemplate": "ghcr.io/grafana/grafana-build-tools",
       "datasourceTemplate": "docker",
       "versioningTemplate": "semver",
+      "registryUrlTemplate": "https://ghcr.io",
       "fileMatch": [
-        "^\\.github/workflows/.*\\.ya?ml$",
         "(^|/)Makefile$",
         ".*\\.jsonnet$",
-        ".*\\.mk$"
+        ".*\\.mk$",
+        "^\\.github/workflows/.*\\.ya?ml$"
       ],
       "matchStrings": [
         "ghcr.io/grafana/grafana-build-tools:(?<currentValue>\\S+)"
