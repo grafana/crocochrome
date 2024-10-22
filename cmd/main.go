@@ -29,8 +29,9 @@ func main() {
 		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
 		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
 		// because we told it to.
-		TempDir:  "/chromium-tmp",
-		Registry: registry,
+		TempDir:      "/chromium-tmp",
+		Registry:     registry,
+		ExtraUATerms: "GrafanaSyntheticMonitoring",
 	})
 
 	server := crocohttp.New(logger, supervisor)
