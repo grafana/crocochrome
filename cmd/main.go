@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,6 +35,13 @@ func main() {
 		ExtraUATerms: "GrafanaSyntheticMonitoring",
 	})
 
+	err := supervisor.ComputeUserAgent(context.Background())
+	if err != nil {
+		logger.Error("Computing user agent", "err", err)
+		os.Exit(1)
+		return
+	}
+
 	server := crocohttp.New(logger, supervisor)
 	instrumentedServer := metrics.InstrumentHTTP(registry, server)
 
@@ -43,7 +51,7 @@ func main() {
 	const address = ":8080"
 	logger.Info("Starting HTTP server", "address", address)
 
-	err := http.ListenAndServe(address, mux)
+	err = http.ListenAndServe(address, mux)
 	if err != nil {
 		logger.Error("Setting up HTTP listener", "err", err)
 	}
