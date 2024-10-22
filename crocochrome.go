@@ -161,90 +161,12 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
+	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
 	go func() {
-		logger.Debug("starting session")
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-
-		tmpDir, err := s.mkdirTemp()
+		err := s.launch(ctx, id)
 		if err != nil {
-			logger.Error("creating temporary directory", "err", err)
-			return
+			logger.Error("launching chromium", "err", err)
 		}
-
-		defer func() {
-			// Clean up files after chromium exits.
-			err := os.RemoveAll(tmpDir)
-			if err != nil {
-				panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
-			}
-		}()
-
-		cmd := exec.CommandContext(ctx,
-			s.opts.ChromiumPath,
-			// The following flags have been tested to be required:
-			"--headless",
-			"--remote-debugging-address=0.0.0.0",
-			"--remote-debugging-port="+s.opts.ChromiumPort,
-			"--no-sandbox", // We run a single instance as nobody:nobody, making this redundant.
-			// Containers often have a small /dev/shm, causing crashes if chromium uses it.
-			// http://crbug.com/715363
-			"--disable-dev-shm-usage",
-
-			// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
-			// needed:
-			"--disable-breakpad", "--disable-crash-reporter", // Disable crash reporting.
-			"--disable-3d-apis", // Disable webGL and the likes.
-			"--disable-audio-input", "--disable-audio-output",
-			"--disable-default-apps", // Disables installation of default apps on first run.
-			"--disable-extensions",
-			"--disable-file-system",
-			"--disable-first-run-ui",
-			"--disable-notifications",
-			"--disable-smooth-scrolling", // No need to burn CPU on this.
-		)
-		cmd.Env = []string{
-			// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
-			// we created for this session, because /tmp is read-only in production.
-			// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
-			"TMPDIR=" + tmpDir,
-		}
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-		if s.opts.UserGroup != 0 {
-			cmd.SysProcAttr = &syscall.SysProcAttr{
-				Credential: &syscall.Credential{
-					Uid: uint32(s.opts.UserGroup),
-					Gid: uint32(s.opts.UserGroup),
-				},
-			}
-		}
-
-		created := time.Now()
-		defer func() {
-			s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
-		}()
-
-		err = cmd.Run()
-		if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
-			logger.Error("running chromium", "err", err)
-			logger.Error("chromium output", "stdout", stdout.String())
-			logger.Error("chromium output", "stderr", stderr.String())
-
-			if ps := cmd.ProcessState; ps != nil {
-				logger.Debug(
-					"chromium process finished",
-					"state", ps.String(),
-					"exitCode", ps.ExitCode(),
-					"rss", ps.SysUsage().(*syscall.Rusage).Maxrss,
-				)
-			}
-
-			return
-		}
-
-		logger.Debug("chromium output", "stdout", stdout.String())
-		logger.Debug("chromium output", "stderr", stderr.String())
 	}()
 
 	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
@@ -300,6 +222,96 @@ func (s *Supervisor) killExisting() {
 		s.logger.Error("existing session found, killing", "sessionID", id)
 		s.delete(id)
 	}
+}
+
+// launch prepares the requires directories and launches chromium, blocking until it exits.
+func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
+	logger := s.logger.With("sessionID", sessionID)
+
+	logger.Debug("starting session")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	tmpDir, err := s.mkdirTemp()
+	if err != nil {
+		return fmt.Errorf("creating temporary directory: %w", err)
+	}
+
+	defer func() {
+		// Clean up files after chromium exits.
+		err := os.RemoveAll(tmpDir)
+		if err != nil {
+			panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
+		}
+	}()
+
+	cmd := exec.CommandContext(ctx,
+		s.opts.ChromiumPath,
+		// The following flags have been tested to be required:
+		"--headless",
+		"--remote-debugging-address=0.0.0.0",
+		"--remote-debugging-port="+s.opts.ChromiumPort,
+		"--no-sandbox", // We run a single instance as nobody:nobody, making this redundant.
+		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
+		// http://crbug.com/715363
+		"--disable-dev-shm-usage",
+
+		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
+		// needed:
+		"--disable-breakpad", "--disable-crash-reporter", // Disable crash reporting.
+		"--disable-3d-apis", // Disable webGL and the likes.
+		"--disable-audio-input", "--disable-audio-output",
+		"--disable-default-apps", // Disables installation of default apps on first run.
+		"--disable-extensions",
+		"--disable-file-system",
+		"--disable-first-run-ui",
+		"--disable-notifications",
+		"--disable-smooth-scrolling", // No need to burn CPU on this.
+	)
+	cmd.Env = []string{
+		// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
+		// we created for this session, because /tmp is read-only in production.
+		// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
+		"TMPDIR=" + tmpDir,
+	}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if s.opts.UserGroup != 0 {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: uint32(s.opts.UserGroup),
+				Gid: uint32(s.opts.UserGroup),
+			},
+		}
+	}
+
+	created := time.Now()
+	defer func() {
+		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
+	}()
+
+	err = cmd.Run()
+	if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
+		logger.Error("running chromium", "err", err)
+		logger.Error("chromium output", "stdout", stdout.String())
+		logger.Error("chromium output", "stderr", stderr.String())
+
+		if ps := cmd.ProcessState; ps != nil {
+			logger.Debug(
+				"chromium process finished",
+				"state", ps.String(),
+				"exitCode", ps.ExitCode(),
+				"rss", ps.SysUsage().(*syscall.Rusage).Maxrss,
+			)
+		}
+
+		return err
+	}
+
+	logger.Debug("chromium output", "stdout", stdout.String())
+	logger.Debug("chromium output", "stderr", stderr.String())
+
+	return nil
 }
 
 func (s *Supervisor) mkdirTemp() (string, error) {
