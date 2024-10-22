@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -33,6 +34,11 @@ type Supervisor struct {
 	sessions    map[string]session
 	sessionsMtx sync.Mutex
 	metrics     *metrics.SupervisorMetrics
+	// userAgent stores a "patched" user agent derived from the default UA for the installed chromium. We "patch" the
+	// default user agent so chromium does not identify itself as headless. In order to do that, we have to run chromium
+	// once, get its user agent, and then make modifications. After doing that process, we store the result here.
+	// ComputeUserAgent() performs this process.
+	userAgent string
 }
 
 type Options struct {
@@ -52,6 +58,9 @@ type Options struct {
 	TempDir string
 	// Registry is a prometheus registerer for telemetry.
 	Registry prometheus.Registerer
+	// ExtraUATerms is appended, after a space, to the chromium user agent. It can be used to add vendor-specific
+	// information to it, such as the name of the product using chromium to perform requests.
+	ExtraUATerms string
 }
 
 const (
@@ -245,12 +254,11 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		}
 	}()
 
-	cmd := exec.CommandContext(ctx,
-		s.opts.ChromiumPath,
+	args := []string{
 		// The following flags have been tested to be required:
 		"--headless",
 		"--remote-debugging-address=0.0.0.0",
-		"--remote-debugging-port="+s.opts.ChromiumPort,
+		"--remote-debugging-port=" + s.opts.ChromiumPort,
 		"--no-sandbox", // We run a single instance as nobody:nobody, making this redundant.
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
@@ -267,6 +275,18 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		"--disable-first-run-ui",
 		"--disable-notifications",
 		"--disable-smooth-scrolling", // No need to burn CPU on this.
+	}
+
+	if s.userAgent != "" {
+		args = append(
+			args,
+			"--user-agent="+s.userAgent,
+		)
+	}
+
+	cmd := exec.CommandContext(ctx,
+		s.opts.ChromiumPath,
+		args...,
 	)
 	cmd.Env = []string{
 		// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
@@ -343,6 +363,41 @@ func (s *Supervisor) mkdirTemp() (string, error) {
 	}
 
 	return tmpDir, nil
+}
+
+// ComputeUserAgent runs chromium once, retrieves its default user agent, and stores a patched version so it can be used
+// in all subsequent calls.
+func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		err := s.launch(ctx, "compute-user-agent")
+		if err != nil {
+			s.logger.Error("launching chromium", "err", err)
+		}
+	}()
+
+	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer versionCancel()
+
+	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
+	if err != nil {
+		return fmt.Errorf("contacting chromium: %w", err)
+	}
+
+	s.logger.Debug("Found default user agent", "defaultUA", version.UserAgent)
+
+	patchedUA := strings.ReplaceAll(version.UserAgent, "Headless", "")
+	if s.opts.ExtraUATerms != "" {
+		patchedUA += " " + s.opts.ExtraUATerms
+	}
+
+	s.userAgent = patchedUA
+
+	s.logger.Info("Computed new user agent", "UA", s.userAgent)
+
+	return nil
 }
 
 // randString returns 12 random hex characters.
