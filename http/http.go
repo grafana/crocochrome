@@ -26,6 +26,7 @@ func New(logger *slog.Logger, supervisor *crocochrome.Supervisor) *Server {
 		mux:        mux,
 	}
 
+	mux.HandleFunc("GET /health", func(rw http.ResponseWriter, r *http.Request) { rw.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /sessions", api.List)
 	mux.HandleFunc("POST /sessions", api.Create)
 	mux.HandleFunc("DELETE /sessions/{id}", api.Delete)
