@@ -312,23 +312,37 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	}()
 
 	err = cmd.Run()
+
+	attrs := make([]slog.Attr, 0, 9)
+
+	if err != nil {
+		attrs = append(attrs, slog.Attr{Key: "err", Value: slog.AnyValue(err)})
+	}
+
+	if cmd.ProcessState != nil {
+		attrs = append(attrs,
+			slog.Attr{Key: "pid", Value: slog.IntValue(cmd.ProcessState.Pid())},
+			slog.Attr{Key: "exitCode", Value: slog.IntValue(cmd.ProcessState.ExitCode())},
+			slog.Attr{Key: "processState", Value: slog.StringValue(cmd.ProcessState.String())},
+			slog.Attr{Key: "systemTime", Value: slog.DurationValue(cmd.ProcessState.SystemTime())},
+			slog.Attr{Key: "userTime", Value: slog.DurationValue(cmd.ProcessState.UserTime())},
+			slog.Attr{Key: "sysUsage", Value: slog.AnyValue(cmd.ProcessState.SysUsage())},
+		)
+	}
+
 	if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
 		s.metrics.ChromiumExecutions.With(map[string]string{
 			metrics.ExecutionState: metrics.ExecutionStateFailed,
 		}).Inc()
 
-		logger.Error("running chromium", "err", err)
-		logger.Error("chromium output", "stdout", stdout.String())
-		logger.Error("chromium output", "stderr", stderr.String())
+		// Append stdout and stderr to the log if there was an error,
+		// as the log message may be useful for debugging what happened.
+		attrs = append(attrs,
+			slog.Attr{Key: "stdout", Value: slog.StringValue(stdout.String())},
+			slog.Attr{Key: "stderr", Value: slog.StringValue(stderr.String())},
+		)
 
-		if ps := cmd.ProcessState; ps != nil {
-			logger.Debug(
-				"chromium process finished",
-				"state", ps.String(),
-				"exitCode", ps.ExitCode(),
-				"rss", ps.SysUsage().(*syscall.Rusage).Maxrss,
-			)
-		}
+		logger.LogAttrs(ctx, slog.LevelError, "chromium process finished", attrs...)
 
 		return err
 	}
@@ -337,8 +351,15 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		metrics.ExecutionState: metrics.ExecutionStateFinished,
 	}).Inc()
 
-	logger.Debug("chromium output", "stdout", stdout.String())
-	logger.Debug("chromium output", "stderr", stderr.String())
+	// Avoid spamming the logs with chromium's output, unless the logging level is debug.
+	if logger.Enabled(ctx, slog.LevelDebug) {
+		attrs = append(attrs,
+			slog.Attr{Key: "stdout", Value: slog.StringValue(stdout.String())},
+			slog.Attr{Key: "stderr", Value: slog.StringValue(stderr.String())},
+		)
+	}
+
+	logger.LogAttrs(ctx, slog.LevelInfo, "chromium process finished", attrs...)
 
 	return nil
 }
