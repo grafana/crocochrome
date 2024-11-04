@@ -11,6 +11,10 @@ import (
 const (
 	metricNs                   = "sm"
 	metricSubsystemCrocochrome = "crocochrome"
+
+	ExecutionState         = "state"
+	ExecutionStateFinished = "finished"
+	ExecutionStateFailed   = "failed"
 )
 
 // InstrumentHTTP uses promhttp to instrument a handler with total, duration, and in-flight requests.
@@ -47,7 +51,8 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 
 // SupervisorMetrics contains metrics used by the crocochrome supervisor.
 type SupervisorMetrics struct {
-	SessionDuration prometheus.Histogram
+	SessionDuration    prometheus.Histogram
+	ChromiumExecutions *prometheus.CounterVec
 }
 
 // Supervisor registers and returns handlers for metrics used by the supervisor.
@@ -65,9 +70,21 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 				NativeHistogramMinResetDuration: 1 * time.Hour,
 			},
 		),
+		ChromiumExecutions: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "chromium_executions_total",
+				Help: "Total number of executions, labeled by \"state\". " +
+					"\"finished\" means the execution terminated normally as part of the session cancellation. " +
+					"\"failed\" means chromium existed with an unexpected error.",
+			},
+			[]string{ExecutionState},
+		),
 	}
 
 	reg.MustRegister(m.SessionDuration)
+	reg.MustRegister(m.ChromiumExecutions)
 
 	return m
 }

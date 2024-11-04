@@ -313,6 +313,10 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 
 	err = cmd.Run()
 	if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
+		s.metrics.ChromiumExecutions.With(map[string]string{
+			metrics.ExecutionState: metrics.ExecutionStateFailed,
+		}).Inc()
+
 		logger.Error("running chromium", "err", err)
 		logger.Error("chromium output", "stdout", stdout.String())
 		logger.Error("chromium output", "stderr", stderr.String())
@@ -328,6 +332,10 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 
 		return err
 	}
+
+	s.metrics.ChromiumExecutions.With(map[string]string{
+		metrics.ExecutionState: metrics.ExecutionStateFinished,
+	}).Inc()
 
 	logger.Debug("chromium output", "stdout", stdout.String())
 	logger.Debug("chromium output", "stderr", stderr.String())
