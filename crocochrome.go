@@ -320,6 +320,12 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	}
 
 	if cmd.ProcessState != nil {
+		if rUsage, isSyscallRusage := cmd.ProcessState.SysUsage().(*syscall.Rusage); rUsage != nil && isSyscallRusage {
+			s.metrics.ChromiumResources.With(map[string]string{
+				metrics.Resource: metrics.ResourceRSS,
+			}).Observe(float64(rUsage.Maxrss * 1024)) // Convert from KiB to Bytes, as it is conventional in metrics.
+		}
+
 		attrs = append(attrs,
 			slog.Attr{Key: "pid", Value: slog.IntValue(cmd.ProcessState.Pid())},
 			slog.Attr{Key: "exitCode", Value: slog.IntValue(cmd.ProcessState.ExitCode())},
