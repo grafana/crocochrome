@@ -33,7 +33,7 @@ RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 # The --repository arg is required for renovate to know which alpine repo it should look for updates in.
 # To keep the renovate regex simple, only keep one package installation per line.
 RUN apk --no-cache add --repository community tini=0.19.0-r3 && \
-  apk --no-cache add --repository community chromium-swiftshader=130.0.6723.91-r0
+  apk --no-cache add --repository community chromium-swiftshader=130.0.6723.116-r0
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
 # potential attack surface, we get rid of any file that has the setuid bit set, such as
