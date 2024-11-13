@@ -32,9 +32,16 @@ jobs:
     name: Build container image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: |
-          make build-container
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build contianer
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          tags: ci.local/crocochrome:${{ github.sha }}
+          platforms: linux/amd64,linux/arm64
 
   golangci:
     name: Lint
