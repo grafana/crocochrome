@@ -8,9 +8,9 @@ permissions:
 on:
   push:
     branches:
-      - 'main'
+      - "main"
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   publish:
@@ -25,6 +25,9 @@ jobs:
           echo "name=$(basename '${{ github.repository }}')" >> $GITHUB_OUTPUT
           echo "version=$(./scripts/version)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
+      # grafana/shared-workflows/actions/push-to-gar-docker runs setup-buildx, but not setup-qemu.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Login to Google Artifact Registry
         uses: grafana/shared-workflows/actions/login-to-gar@main
       - name: Build container and push to GAR
@@ -34,3 +37,4 @@ jobs:
           tags: |-
             ${{ steps.repo.outputs.version }}
           push: true
+          platforms: linux/amd64,linux/arm64
