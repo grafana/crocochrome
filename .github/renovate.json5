@@ -48,6 +48,10 @@
       "matchManagers": ["gomod"],
       "matchPackageNames": "go.opentelemetry.io/**",
       "groupName": "otel-go"
+    },
+    {
+      "matchPackageNames": "**/renovate",
+      "extends": ["schedule:weekly"]
     }
   ],
 
