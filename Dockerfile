@@ -11,7 +11,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/root/go/pkg \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
 
-FROM alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d as setcapper
+# For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:131.0.6778.85-r0-3.20.3 as setcapper
 
 RUN apk --no-cache add libcap
 
@@ -22,18 +23,11 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
-# WARNING: Do NOT upgrade alpine, as this release is the last one containing a working chromium.
-# 3.20.0 onwards do not support listening on addresses other than localhost, which is required for crocochrome to work.
-# https://issues.chromium.org/issues/327558594
-FROM alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:131.0.6778.85-r0-3.20.3
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
-# Renovate updates the pinned packages below.
-# The --repository arg is required for renovate to know which alpine repo it should look for updates in.
-# To keep the renovate regex simple, only keep one package installation per line.
-RUN apk --no-cache add --repository community tini=0.19.0-r3 && \
-  apk --no-cache add --repository community chromium-swiftshader=131.0.6778.85-r0
+RUN apk --no-cache add --repository community tini
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
 # potential attack surface, we get rid of any file that has the setuid bit set, such as
