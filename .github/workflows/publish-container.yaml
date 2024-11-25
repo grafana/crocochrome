@@ -1,9 +1,8 @@
 name: Publish container
 
-# These permissions are needed to assume roles from Github's OIDC.
 permissions:
   contents: read
-  id-token: write
+  packages: write
 
 on:
   push:
@@ -22,19 +21,21 @@ jobs:
       - name: Compute repo metadata
         id: repo
         run: |-
-          echo "name=$(basename '${{ github.repository }}')" >> $GITHUB_OUTPUT
           echo "version=$(./scripts/version)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
       # grafana/shared-workflows/actions/push-to-gar-docker runs setup-buildx, but not setup-qemu.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      - name: Login to Google Artifact Registry
-        uses: grafana/shared-workflows/actions/login-to-gar@main
-      - name: Build container and push to GAR
-        uses: grafana/shared-workflows/actions/push-to-gar-docker@main
+      - name: Log into ghcr.io
+        uses: docker/login-action@v3
         with:
-          image_name: ${{ steps.repo.outputs.name }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
           tags: |-
-            ${{ steps.repo.outputs.version }}
+            ${{ github.repository }}:${{ steps.repo.outputs.version }}
           push: true
           platforms: linux/amd64,linux/arm64
