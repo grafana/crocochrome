@@ -15,6 +15,9 @@ const (
 	ExecutionState         = "state"
 	ExecutionStateFinished = "finished"
 	ExecutionStateFailed   = "failed"
+
+	Resource    = "resource"
+	ResourceRSS = "rss"
 )
 
 // InstrumentHTTP uses promhttp to instrument a handler with total, duration, and in-flight requests.
@@ -53,6 +56,7 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 type SupervisorMetrics struct {
 	SessionDuration    prometheus.Histogram
 	ChromiumExecutions *prometheus.CounterVec
+	ChromiumResources  *prometheus.HistogramVec
 }
 
 // Supervisor registers and returns handlers for metrics used by the supervisor.
@@ -81,10 +85,25 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 			},
 			[]string{ExecutionState},
 		),
+		ChromiumResources: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "chromium_resource_usage",
+				Help: "Resources used by chromium when the execution ends." +
+					"Memory resources are expressed in bytes.",
+				Buckets:                         prometheus.LinearBuckets(0, 64<<20, 16), // 64Mi*16=1024Mi
+				NativeHistogramBucketFactor:     1.2,
+				NativeHistogramMaxBucketNumber:  32,
+				NativeHistogramMinResetDuration: 1 * time.Hour,
+			},
+			[]string{Resource},
+		),
 	}
 
 	reg.MustRegister(m.SessionDuration)
 	reg.MustRegister(m.ChromiumExecutions)
+	reg.MustRegister(m.ChromiumResources)
 
 	return m
 }
