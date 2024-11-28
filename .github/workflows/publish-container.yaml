@@ -38,6 +38,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           tags: |-
-            ${{ github.repository }}:${{ steps.repo.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ steps.repo.outputs.version }}
           push: true
           platforms: linux/amd64,linux/arm64
