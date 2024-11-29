@@ -2,16 +2,23 @@ name: Validate renovate config
 on:
   pull_request:
     paths:
-      - "**renovate*.*"
+      # When renovate config changes:
+      - "renovate.*"
+      - ".renovate.*"
+      - ".github/renovate.*"
+      # Also when renovate version changes:
+      - ".github/workflows/renovate*"
+
 jobs:
-  validate:
+  renovate:
+    permissions:
+      # Needed for logging into vault.
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout Code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
-      - name: Validate renovate config
-        run: |-
-          # Renovate updates the line below. Please keep its formatting as it is.
-          export RENOVATE_IMAGE=ghcr.io/renovatebot/renovate:39.29.0@sha256:9ac3737e9d3402494cd1a538f9689ed0ddb5dfc8e6dfc2dfc6c0a53ef452d716
-          docker run -i --rm -v $(realpath .):/repo -w /repo --entrypoint renovate-config-validator "$RENOVATE_IMAGE" --strict
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Self-hosted renovate
+        uses: grafana/sm-renovate/actions/renovate-validate@main
