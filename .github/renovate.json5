@@ -6,6 +6,20 @@
     "github>grafana/sm-renovate//presets/go.json5",
   ],
   "commitMessagePrefix": "",
+  "customManagers": [
+    {
+      // Update k6 image used for integration tests only.
+      "customType": "regex",
+      "depNameTemplate": "grafana/k6",
+      "datasourceTemplate": "docker",
+      "fileMatch": [
+        "^integration/integration_test.go$",
+      ],
+      "matchStrings": [
+        "grafana/k6:(?<currentValue>[\\w.-]+)",
+      ],
+    },
+  ],
   "packageRules": [
     {
       // The default "docker" versioning will try to restrict upgrades to versions that do not change everything after
