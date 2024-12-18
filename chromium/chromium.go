@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type VersionInfo struct {
@@ -17,25 +20,15 @@ type VersionInfo struct {
 	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"` // /!\ This one is lowercase in JSON.
 }
 
-type Client struct {
-	HTTP http.Client
-}
-
-func NewClient() *Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-
-	return &Client{
-		HTTP: http.Client{
-			Transport: transport,
-		},
-	}
-}
+type Client struct{}
 
 // Version pokes chromium's /json/version endpoint, and returns its response.
 // It will retry with exponential backoff until timeout is reached.
 func (c *Client) Version(ctx context.Context, address string) (versionInfo *VersionInfo, err error) {
-	delay := 100 * time.Millisecond
+	ctx, versionSpan := trace.SpanFromContext(ctx).TracerProvider().Tracer("").Start(ctx, "fetch chromium version")
+	defer versionSpan.End()
 
+	delay := 100 * time.Millisecond
 	for {
 		select {
 		case <-ctx.Done():
@@ -65,7 +58,7 @@ func (c *Client) version(ctx context.Context, address string) (*VersionInfo, err
 		return nil, fmt.Errorf("building request: %w", err)
 	}
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.httpClient(ctx).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
@@ -79,4 +72,19 @@ func (c *Client) version(ctx context.Context, address string) (*VersionInfo, err
 	}
 
 	return &versionInfo, nil
+}
+
+func (c *Client) httpClient(ctx context.Context) *http.Client {
+	return &http.Client{
+		Transport: otelhttp.NewTransport(
+			http.DefaultTransport,
+			otelhttp.WithTracerProvider(trace.SpanFromContext(ctx).TracerProvider()),
+			// Span names do not include method and path by default to avoid cardinality explosion with paths containing
+			// IDs. As this is not the case with this endpoint, we use a custom formatter that includes both.
+			otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+				return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+			}),
+			// No propagator, as there is no need to send TraceIDs in outgoing requests.
+		),
+	}
 }
