@@ -20,6 +20,7 @@ import (
 	"github.com/grafana/crocochrome/chromium"
 	"github.com/grafana/crocochrome/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Supervisor struct {
@@ -108,7 +109,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 	return &Supervisor{
 		opts:     opts,
 		logger:   logger,
-		cclient:  chromium.NewClient(),
+		cclient:  &chromium.Client{},
 		sessions: map[string]session{},
 		metrics:  metrics.Supervisor(opts.Registry),
 	}
@@ -146,7 +147,9 @@ func (s *Supervisor) Sessions() []string {
 // Currently, creating a new session will terminate other existing ones, if present. Clients should not rely on this
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
-func (s *Supervisor) Create() (SessionInfo, error) {
+// Context passed to this function is used only to carry tracing data. Cancelling the context will *not* terminate the
+// session created by this method.
+func (s *Supervisor) Create(ctx context.Context) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -155,7 +158,9 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 	id := randString()
 	logger := s.logger.With("sessionID", id)
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
+	// Create a new context for the session with its own lifecycle separate from the supplied context, as that one may
+	// have deadlines or cancellation handles we do _not_ want to inherit.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.opts.SessionTimeout)
 
 	// Register a function that removes the session from the map when the context is cancelled.
 	// It is okay to register this before adding the session to the map as s.Delete is a no-op if the session does not
@@ -237,6 +242,13 @@ func (s *Supervisor) killExisting() {
 // chromium. The sessionID is used only for logging.
 func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	logger := s.logger.With("sessionID", sessionID)
+
+	ctx, chromiumSpan := trace.SpanFromContext(ctx).TracerProvider().Tracer("").Start(ctx, "chromium run")
+	defer chromiumSpan.End()
+
+	// Chromium run span will outlive the span present in tracingCtx, so we cannot create a child span. Instead, we
+	// create a fresh span and link the previous span to it.
+	chromiumSpan.AddLink(trace.LinkFromContext(ctx))
 
 	logger.Debug("starting session")
 	stdout := &bytes.Buffer{}
@@ -337,6 +349,8 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	}
 
 	if err != nil && !errors.Is(ctx.Err(), context.Canceled) {
+		chromiumSpan.RecordError(err)
+
 		s.metrics.ChromiumExecutions.With(map[string]string{
 			metrics.ExecutionState: metrics.ExecutionStateFailed,
 		}).Inc()

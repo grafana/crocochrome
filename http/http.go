@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/crocochrome"
 	"github.com/koding/websocketproxy"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Server struct {
@@ -47,8 +48,9 @@ func (s *Server) List(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
-	session, err := s.supervisor.Create()
+	session, err := s.supervisor.Create(r.Context())
 	if err != nil {
+		trace.SpanFromContext(r.Context()).RecordError(err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		_, _ = rw.Write([]byte(err.Error()))
 		return
