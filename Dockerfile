@@ -21,7 +21,7 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # The following capabilities are used by sm-k6-runner to sandbox the k6 binary. More details about what each cap is used
 # for can be found in /sandbox/sandbox.go.
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
-RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
+RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner,cap_sys_resource+ep /usr/local/bin/crocochrome
 
 FROM ghcr.io/grafana/chromium-swiftshader-alpine:131.0.6778.139-r1-3.21.0@sha256:d3071cfe8721cee56fecf8e5d0bf77031d531bc1091b04b05bccf5f50a32365b
 
