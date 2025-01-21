@@ -267,8 +267,8 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 
 		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
 		// needed:
-		"--disable-breakpad", "--disable-crash-reporter", // Disable crash reporting.
-		"--disable-3d-apis", // Disable webGL and the likes.
+		"--disable-breakpad", // Disable crash reporting.
+		"--disable-3d-apis",  // Disable webGL and the likes.
 		"--disable-audio-input", "--disable-audio-output",
 		"--disable-default-apps", // Disables installation of default apps on first run.
 		"--disable-extensions",
