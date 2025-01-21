@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM ghcr.io/grafana/grafana-build-tools:v0.36.0@sha256:deec32592848cde11ff64b4a5803b85546027dfb7b98921a0d0b89cd2226612f as buildtools
+FROM --platform=$BUILDPLATFORM ghcr.io/grafana/grafana-build-tools:v0.36.0@sha256:deec32592848cde11ff64b4a5803b85546027dfb7b98921a0d0b89cd2226612f AS buildtools
 WORKDIR /crocochrome
 
 COPY . .
@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:131.0.6778.139-r1-3.21.0@sha256:d3071cfe8721cee56fecf8e5d0bf77031d531bc1091b04b05bccf5f50a32365b as setcapper
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:131.0.6778.139-r1-3.21.0@sha256:d3071cfe8721cee56fecf8e5d0bf77031d531bc1091b04b05bccf5f50a32365b AS setcapper
 
 RUN apk --no-cache add libcap
 
