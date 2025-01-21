@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,6 +18,11 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
+
+	err := oomAdjust(-999)
+	if err != nil {
+		logger.Error("could not adjust OOM score", "err", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -35,7 +41,7 @@ func main() {
 		ExtraUATerms: "GrafanaSyntheticMonitoring",
 	})
 
-	err := supervisor.ComputeUserAgent(context.Background())
+	err = supervisor.ComputeUserAgent(context.Background())
 	if err != nil {
 		logger.Error("Computing user agent", "err", err)
 		os.Exit(1)
@@ -55,4 +61,24 @@ func main() {
 	if err != nil {
 		logger.Error("Setting up HTTP listener", "err", err)
 	}
+}
+
+// oomAdjust writes adj to /proc/self/oom_score_adj. Negative values make the this process less likely to be killed.
+// Ref: https://www.man7.org/linux/man-pages/man5/proc_pid_oom_adj.5.html
+// We do this to try and prevent the linux kernel from killing us (the supervisor) instead of the browser.
+// This function requires CAP_SYS_RESOURCE to be granted to work.
+func oomAdjust(adj int) error {
+	oomScoreAdj, err := os.OpenFile("/proc/self/oom_score_adj", os.O_WRONLY, os.FileMode(0o600))
+	if err != nil {
+		return fmt.Errorf("opening oom_score_adj: %w", err)
+	}
+
+	defer oomScoreAdj.Close()
+
+	_, err = fmt.Fprintf(oomScoreAdj, "%d", adj)
+	if err != nil {
+		return fmt.Errorf("writing new score to oom_score_adj. Is the process missing CAP_SYS_RESOURCE?: %w", err)
+	}
+
+	return nil
 }
