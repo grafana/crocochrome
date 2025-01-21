@@ -26,6 +26,8 @@ func main() {
 		ChromiumPath: "chromium",
 		// Id for nobody user and group on alpine.
 		UserGroup: 65534,
+		// Make chromium very attractive to the OOM killer, so it doesn't kill us.
+		OOMScoreAdj: 1000,
 		// In production we mount an emptyDir here, as opposed to /tmp, and configure chromium to write everything in
 		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
 		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
