@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,9 +24,8 @@ import (
 func TestIntegration(t *testing.T) {
 	t.Parallel()
 
-	skipEnv := "TEST_INTEGRATION_SKIP"
-	if os.Getenv(skipEnv) != "" {
-		t.Skipf("Skipping integration test as %q not empty", skipEnv)
+	if testing.Short() {
+		t.Skipf("Skipping integration test due to -short")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
