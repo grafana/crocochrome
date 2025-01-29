@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM ghcr.io/grafana/grafana-build-tools:v0.37.0@sha256:64c6ff07fce6f93ba3732d4617b7ea3a370d7e87fd4e4cb92fd4faa25364cd50 AS buildtools
+FROM --platform=$BUILDPLATFORM ghcr.io/grafana/grafana-build-tools:v0.37.1@sha256:79092b373d4130035f1e0e70b27e951e6b3fa640c4a5da12fcf4ec6b818729e3 AS buildtools
 WORKDIR /crocochrome
 
 COPY . .
