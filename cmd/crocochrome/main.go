@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
 
 	"github.com/grafana/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/http"
@@ -17,6 +19,17 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
+
+	const oomScore = -500
+	if out, err := choom(oomScore); err != nil {
+		logger.Error(
+			"Error changing OOM score, assuming this is not a production environment and continuing anyway",
+			"err", err,
+			"choomOutput", string(out),
+		)
+	} else {
+		logger.Info("Main process OOM score adjusted successfully", "oomScore", oomScore)
+	}
 
 	mux := http.NewServeMux()
 
@@ -55,4 +68,10 @@ func main() {
 	if err != nil {
 		logger.Error("Setting up HTTP listener", "err", err)
 	}
+}
+
+// choom runs the choom helper (source included in this repo) to lower the current process OOM score.
+func choom(score int) ([]byte, error) {
+	choom := exec.Command("choom", strconv.Itoa(os.Getpid()), strconv.Itoa(score))
+	return choom.CombinedOutput()
 }
