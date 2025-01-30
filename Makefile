@@ -12,6 +12,7 @@ buildtools = $(docker) run --rm -i \
 .PHONY: build
 build:
 	CGO_ENABLED=0 go build -v -o build/sm-k6-archiver ./cmd
+	CGO_ENABLED=0 go build -v -o build/choom ./cmd/choom/
 
 image ?= test.local/sm-k6-archiver
 .PHONY: build-container
