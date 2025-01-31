@@ -67,6 +67,8 @@ func main() {
 	err = http.ListenAndServe(address, mux)
 	if err != nil {
 		logger.Error("Setting up HTTP listener", "err", err)
+		os.Exit(1)
+		return
 	}
 }
 
