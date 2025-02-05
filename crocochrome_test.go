@@ -1,6 +1,7 @@
 package crocochrome_test
 
 import (
+	"context"
 	"log/slog"
 	"net/url"
 	"os"
@@ -24,7 +25,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		session, err := cc.Create()
+		session, err := cc.Create(context.Background())
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
@@ -64,7 +65,7 @@ func TestCrocochrome(t *testing.T) {
 			port := testutil.HTTPInfo(t, testutil.InternalServerErrorHandler)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-			_, err := cc.Create()
+			_, err := cc.Create(context.Background())
 			if err == nil {
 				t.Fatalf("expected an error, got: %v", err)
 			}
@@ -78,7 +79,7 @@ func TestCrocochrome(t *testing.T) {
 			hb := testutil.NewHeartbeat(t)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: "0"})
 
-			_, err := cc.Create()
+			_, err := cc.Create(context.Background())
 			if err == nil {
 				t.Fatalf("expected an error, got: %v", err)
 			}
@@ -94,7 +95,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		sess, err := cc.Create()
+		sess, err := cc.Create(context.Background())
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
@@ -117,14 +118,14 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
 
-		sess1, err := cc.Create()
+		sess1, err := cc.Create(context.Background())
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
 
 		hb.AssertAliveDead(1, 0)
 
-		_, err = cc.Create()
+		_, err = cc.Create(context.Background())
 		if err != nil {
 			t.Fatalf("creating second session: %v", err)
 		}
@@ -145,7 +146,7 @@ func TestCrocochrome(t *testing.T) {
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
 
-		_, err := cc.Create()
+		_, err := cc.Create(context.Background())
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
