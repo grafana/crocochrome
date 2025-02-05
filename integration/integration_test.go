@@ -60,10 +60,10 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 	})
+	testcontainers.CleanupContainer(t, cc)
 	if err != nil {
 		t.Fatalf("starting crocochrome container: %v", err)
 	}
-	testcontainers.CleanupContainer(t, cc)
 
 	endpoint, err := cc.PortEndpoint(ctx, "8080/tcp", "http")
 	if err != nil {
@@ -83,10 +83,10 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 	})
+	testcontainers.CleanupContainer(t, cc)
 	if err != nil {
 		t.Fatalf("starting k6 container: %v", err)
 	}
-	testcontainers.CleanupContainer(t, cc)
 
 	for _, tc := range []struct {
 		name   string
