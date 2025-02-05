@@ -31,7 +31,7 @@ func TestIntegration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	image, err := buildContainer("..", "crocochrome")
+	image, err := buildImage("..", "crocochrome")
 	if err != nil {
 		t.Fatalf("building crocochrome container: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestIntegration(t *testing.T) {
 	}
 }
 
-// createSession calls the croco
+// createSession calls the crocochrome API to create a session, starting a chromium process and retrieving its WS URL.
 func createSession(endpoint string) (*crocochrome.SessionInfo, error) {
 	resp, err := http.Post(endpoint+"/sessions", "application/json", nil)
 	if err != nil {
