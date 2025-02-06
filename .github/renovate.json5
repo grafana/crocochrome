@@ -5,7 +5,6 @@
     "github>grafana/sm-renovate//presets/synthetic-monitoring.json5",
     "github>grafana/sm-renovate//presets/go.json5",
   ],
-  "commitMessagePrefix": "",
   "customManagers": [
     {
       // Update k6 image used for integration tests only.
