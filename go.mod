@@ -3,7 +3,7 @@ module github.com/grafana/crocochrome
 go 1.23
 
 require (
-	github.com/docker/docker v27.5.1+incompatible
+	github.com/docker/docker v28.0.0+incompatible
 	github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
 	github.com/prometheus/client_golang v1.21.0
 	github.com/testcontainers/testcontainers-go v0.35.0
