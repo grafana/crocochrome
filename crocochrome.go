@@ -54,6 +54,9 @@ type Options struct {
 	// UserGroup allows running chromium as a different user and group. The same value will be used for both.
 	// If UserGroup is 0, chromium will be run as the current user.
 	UserGroup int
+	// OOMScoreAdj adjusts chromium's oom_score_adj, set via procfs after the chromium is started.
+	// Positive values make chromium more killable.
+	OOMScoreAdj int
 	// TempDir is the path to a writable directory where folders for chromium processes will be stored.
 	TempDir string
 	// Registry is a prometheus registerer for telemetry.
@@ -311,7 +314,32 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
-	err = cmd.Run()
+	err = cmdStartAnd(
+		cmd,
+		// Adjust OOM score.
+		func(c *exec.Cmd) error {
+			if s.opts.OOMScoreAdj == 0 {
+				return nil
+			}
+
+			adjFile, err := os.OpenFile(fmt.Sprintf("/proc/%d/oom_score_adj", c.Process.Pid), os.O_WRONLY, 0o666)
+			if err != nil {
+				return fmt.Errorf("opening oom_score_adj for PID %d", c.Process.Pid)
+			}
+
+			defer adjFile.Close()
+
+			// Ref: https://www.man7.org/linux/man-pages/man5/proc_pid_oom_adj.5.html
+			_, err = fmt.Fprintf(adjFile, "%d", s.opts.OOMScoreAdj)
+			if err != nil {
+				return fmt.Errorf("adjusting chromium OOM score: %w", err)
+			}
+
+			logger.Debug("Chromium PID OOM adjusted", "pid", c.Process.Pid, "oom_score_adj", s.opts.OOMScoreAdj)
+
+			return nil
+		},
+	)
 
 	attrs := make([]slog.Attr, 0, 9)
 
@@ -446,4 +474,25 @@ func randString() string {
 	}
 
 	return hex.EncodeToString(idBytes)
+}
+
+// cmdStartAnd behaves like cmd.Run, meaning that it calls cmd.Start and then cmd.Wait, but allows running specified
+// functions between Start and Wait.
+// If cmd.Start fails, no functions are executed. If any of the functions returns an error, the process is killed and
+// a joint error is returned.
+func cmdStartAnd(cmd *exec.Cmd, fs ...func(*exec.Cmd) error) error {
+	err := cmd.Start()
+	if err != nil {
+		return fmt.Errorf("starting command: %w", err)
+	}
+
+	for _, f := range fs {
+		err = f(cmd)
+		if err != nil {
+			pErr := cmd.Process.Kill()
+			return errors.Join(err, pErr)
+		}
+	}
+
+	return cmd.Wait()
 }
