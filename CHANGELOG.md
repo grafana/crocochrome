@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2](https://github.com/grafana/crocochrome/compare/v0.5.1...v0.5.2) (2025-03-19)
+
+
+### Miscellaneous Chores
+
+* Update docker/login-action digest to 74a5d14 ([cf37736](https://github.com/grafana/crocochrome/commit/cf37736d248f59cf9ac44c155c2ebca19104c426))
+* Update golangci/golangci-lint-action digest to 4696ba8 ([#162](https://github.com/grafana/crocochrome/issues/162)) ([1309038](https://github.com/grafana/crocochrome/commit/13090386747fe01f731f77b8a5925f3911268214))
+
 ## [0.5.1](https://github.com/grafana/crocochrome/compare/v0.5.0...v0.5.1) (2025-03-08)
 
 
