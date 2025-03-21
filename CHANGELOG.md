@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/grafana/crocochrome/compare/v0.5.2...v0.5.3) (2025-03-21)
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1 ([#168](https://github.com/grafana/crocochrome/issues/168)) ([0df2bcf](https://github.com/grafana/crocochrome/commit/0df2bcf893284a2f7d59d57ae5b542fb6da0fdb0))
+
 ## [0.5.2](https://github.com/grafana/crocochrome/compare/v0.5.1...v0.5.2) (2025-03-19)
 
 
