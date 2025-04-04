@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.4](https://github.com/grafana/crocochrome/compare/v0.5.3...v0.5.4) (2025-04-04)
+
+
+### Miscellaneous Chores
+
+* Update actions/create-github-app-token action to v2 ([6c0104d](https://github.com/grafana/crocochrome/commit/6c0104da8682af7092a27fbad61763c5938fc38b))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v134 ([406ace0](https://github.com/grafana/crocochrome/commit/406ace00d6086f27b63652e97bbdc7a72f058a10))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.1.0 ([d578400](https://github.com/grafana/crocochrome/commit/d57840022b7159325524ba423b3e54145122d175))
+* Update grafana/k6 Docker tag to v0.58.0 ([f498599](https://github.com/grafana/crocochrome/commit/f498599997ed30ba47ba050360e3853b57073f56))
+* Update module github.com/testcontainers/testcontainers-go to v0.36.0 ([d418aa5](https://github.com/grafana/crocochrome/commit/d418aa58b5e740be604a521d455bf274795bf0c1))
+
 ## [0.5.3](https://github.com/grafana/crocochrome/compare/v0.5.2...v0.5.3) (2025-03-21)
 
 
