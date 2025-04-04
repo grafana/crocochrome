@@ -9,7 +9,8 @@ ARG TARGETARCH
 # Build with CGO_ENABLED=0 as grafana-build-tools is debian-based.
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/root/go/pkg \
-  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd/crocochrome/ &&\
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/choom ./cmd/choom/
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
 FROM ghcr.io/grafana/chromium-swiftshader-alpine:134.0.6998.117-r0-3.21.3@sha256:7e73134316a360f80e8e27d854faa162ae3815ef850e0e606bf25cd17f4d5f31 AS setcapper
@@ -17,11 +18,16 @@ FROM ghcr.io/grafana/chromium-swiftshader-alpine:134.0.6998.117-r0-3.21.3@sha256
 RUN apk --no-cache add libcap
 
 COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
+COPY --from=buildtools /usr/local/bin/choom /usr/local/bin/choom
 
 # The following capabilities are used by sm-k6-runner to sandbox the k6 binary. More details about what each cap is used
 # for can be found in /sandbox/sandbox.go.
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
+# Grant sys_resource capability to custom choom binary, so it can lower OOM scores, and dac_override so it can do it for
+# other processes.
+# Same warnign as above applies.
+RUN setcap cap_sys_resource,cap_dac_override+ep /usr/local/bin/choom
 
 FROM ghcr.io/grafana/chromium-swiftshader-alpine:134.0.6998.117-r0-3.21.3@sha256:7e73134316a360f80e8e27d854faa162ae3815ef850e0e606bf25cd17f4d5f31
 
@@ -36,6 +42,7 @@ RUN find / -type f -perm -4000 -delete
 
 # The crocochrome binary has extra capabilities, so we make sure only the k6 user (and not nobody) can run it.
 COPY --from=setcapper --chown=k6:k6 --chmod=0500 /usr/local/bin/crocochrome /usr/local/bin/crocochrome
+COPY --from=setcapper --chown=k6:k6 --chmod=0500 /usr/local/bin/choom /usr/local/bin/choom
 
 USER k6
 
