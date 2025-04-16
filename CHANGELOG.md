@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.5](https://github.com/grafana/crocochrome/compare/v0.5.4...v0.5.5) (2025-04-16)
+
+
+### Miscellaneous Chores
+
+* Update actions/setup-go digest to 0aaccfd ([0e861ef](https://github.com/grafana/crocochrome/commit/0e861ef99167fb7e8b521eadaf292f66f66f92af))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v135 ([9fc5632](https://github.com/grafana/crocochrome/commit/9fc563261ea62cf0074f59e942aae44cda5e5dd2))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.2.0 ([0d28723](https://github.com/grafana/crocochrome/commit/0d2872318bbf24bb02e02e046b6571ff317e9407))
+* Update module github.com/prometheus/client_golang to v1.22.0 ([b18e20e](https://github.com/grafana/crocochrome/commit/b18e20efa648806adc214ea2182ba0a7abaeb509))
+
 ## [0.5.4](https://github.com/grafana/crocochrome/compare/v0.5.3...v0.5.4) (2025-04-04)
 
 
