@@ -1,8 +1,7 @@
 name: Publish container
 
 permissions:
-  contents: read
-  packages: write
+  contents: none
 
 on:
   push:
@@ -12,26 +11,35 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0 # Needed for the version script to work.
+          persist-credentials: false
+
       - name: Compute repo metadata
         id: repo
         run: |-
           echo "version=$(./scripts/version)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
       # grafana/shared-workflows/actions/push-to-gar-docker runs setup-buildx, but not setup-qemu.
+      #
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+
       - name: Log into ghcr.io
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
