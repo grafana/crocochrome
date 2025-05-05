@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/grafana/crocochrome/compare/v0.5.5...v0.5.6) (2025-04-25)
+
+
+### Miscellaneous Chores
+
+* Update module github.com/testcontainers/testcontainers-go to v0.37.0 ([#185](https://github.com/grafana/crocochrome/issues/185)) ([1f2132b](https://github.com/grafana/crocochrome/commit/1f2132b2b3f4f97fb22ac083995139cd3bc99dad))
+
 ## [0.5.5](https://github.com/grafana/crocochrome/compare/v0.5.4...v0.5.5) (2025-04-16)
 
 
