@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.7](https://github.com/grafana/crocochrome/compare/v0.5.6...v0.5.7) (2025-05-06)
+
+
+### Miscellaneous Chores
+
+* Update docker/build-push-action digest to 14487ce ([0f23799](https://github.com/grafana/crocochrome/commit/0f23799eef48c6de01a2274d019741b09d01e67d))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.4.0 ([#188](https://github.com/grafana/crocochrome/issues/188)) ([60fc293](https://github.com/grafana/crocochrome/commit/60fc293bafb37703ad79e62d74e3617399e62be3))
+
 ## [0.5.6](https://github.com/grafana/crocochrome/compare/v0.5.5...v0.5.6) (2025-04-25)
 
 
