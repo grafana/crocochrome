@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.8](https://github.com/grafana/crocochrome/compare/v0.5.7...v0.5.8) (2025-05-16)
+
+
+### Miscellaneous Chores
+
+* ci: do not use buildx cache for releases ([e66002d](https://github.com/grafana/crocochrome/commit/e66002dae2df2a9e94bcb5c97290cd96b6bcca33))
+* Update actions/create-github-app-token digest to df432ce ([#189](https://github.com/grafana/crocochrome/issues/189)) ([9982aee](https://github.com/grafana/crocochrome/commit/9982aee7d74cef66a18fdbcfbf9d39c7484bfa97))
+* Update actions/setup-go digest to d35c59a ([#196](https://github.com/grafana/crocochrome/issues/196)) ([44bcc14](https://github.com/grafana/crocochrome/commit/44bcc1451691ecf9dc3655584930ae6a5c13c42f))
+* Update docker/build-push-action digest to 1dc7386 ([#198](https://github.com/grafana/crocochrome/issues/198)) ([283943c](https://github.com/grafana/crocochrome/commit/283943cf0dcb6292cc969ecf853c5d90c5e44468))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.5.2 ([#199](https://github.com/grafana/crocochrome/issues/199)) ([dab2d42](https://github.com/grafana/crocochrome/commit/dab2d429b5583d56a018cb1559a00785970612ab))
+
 ## [0.5.7](https://github.com/grafana/crocochrome/compare/v0.5.6...v0.5.7) (2025-05-06)
 
 
