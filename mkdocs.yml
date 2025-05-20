@@ -4,6 +4,7 @@
 site_name: 'crocochrome Internal Documentation'
 repo_url: https://github.com/grafana/crocochrome
 edit_uri: edit/main/docs
+docs_dir: doc
 
 theme:
   name: material
