@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crocochrome
+  title: crocochrome
+  description: |
+    Crocochrome is a chromium supervisor, which runs and reaps chromium processes on demand.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: grafana/crocochrome
+spec:
+  type: service
+  owner: group:default/synthetic-monitoring-dev
+  lifecycle: production
