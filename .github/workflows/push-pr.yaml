@@ -29,7 +29,11 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ ubuntu-latest, ubuntu-24.04-arm ]
+      fail-fast: false
+    runs-on: ${{ matrix.platform }}
     permissions:
       contents: read
     steps:
