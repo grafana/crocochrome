@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.10](https://github.com/grafana/crocochrome/compare/v0.5.9...v0.5.10) (2025-06-19)
+
+
+### Miscellaneous Chores
+
+* Dockerfile: update chromium-swiftshader-alpine to 137.0.7151.103-r0-edge ([82ff076](https://github.com/grafana/crocochrome/commit/82ff07608807b6b23a25e517cbe73d9d5a80bbad))
+
 ## [0.5.9](https://github.com/grafana/crocochrome/compare/v0.5.8...v0.5.9) (2025-06-19)
 
 
