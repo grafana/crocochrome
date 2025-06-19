@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.9](https://github.com/grafana/crocochrome/compare/v0.5.8...v0.5.9) (2025-06-19)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-buildx-action digest to 18ce135 ([54a514a](https://github.com/grafana/crocochrome/commit/54a514ad638468ee041b075d79ec932a9f97f0f4))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:137.0.7151.68-r0-3.22.0 Docker digest to 5f6a1fc ([378128a](https://github.com/grafana/crocochrome/commit/378128a176d4a7b1ebd1a49bbd7a21b73964add6))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:137.0.7151.68-r0-3.22.0 Docker digest to d1b6268 ([a9618a3](https://github.com/grafana/crocochrome/commit/a9618a357d4b4b5a386ddf2abeb308c635c153fd))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.7.3 ([ddc1207](https://github.com/grafana/crocochrome/commit/ddc1207c7039740f1b37169a5de4ebdd525f3219))
+
 ## [0.5.8](https://github.com/grafana/crocochrome/compare/v0.5.7...v0.5.8) (2025-06-10)
 
 
