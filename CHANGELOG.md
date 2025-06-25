@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.11](https://github.com/grafana/crocochrome/compare/v0.5.10...v0.5.11) (2025-06-20)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-buildx-action digest to e468171 ([4f9e72a](https://github.com/grafana/crocochrome/commit/4f9e72aa47b7f409d74ef572bc8335a29caab76c))
+
 ## [0.5.10](https://github.com/grafana/crocochrome/compare/v0.5.9...v0.5.10) (2025-06-19)
 
 
