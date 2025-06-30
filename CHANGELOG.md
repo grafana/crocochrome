@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/grafana/crocochrome/compare/v0.5.11...v0.6.0) (2025-06-30)
+
+
+### Features
+
+* ci: run test suite on arm ([d3a9c62](https://github.com/grafana/crocochrome/commit/d3a9c628334b082915b2e931526378127c8ef12f))
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v138 ([7719263](https://github.com/grafana/crocochrome/commit/77192634cf6e82b7a48aa51037514e3dbf2eea06))
+* Update grafana/k6 Docker tag to v1.1.0 ([f682898](https://github.com/grafana/crocochrome/commit/f68289836531f488ed1be9f867a67e699b1acde9))
+
 ## [0.5.11](https://github.com/grafana/crocochrome/compare/v0.5.10...v0.5.11) (2025-06-20)
 
 
