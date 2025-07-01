@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/grafana/crocochrome/compare/v0.6.0...v0.6.1) (2025-07-01)
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v138.0.7204.93-r0-3.22.0 ([3cd7c91](https://github.com/grafana/crocochrome/commit/3cd7c91e2cae3ecae020c23b0280788b1f767582))
+
 ## [0.6.0](https://github.com/grafana/crocochrome/compare/v0.5.11...v0.6.0) (2025-06-30)
 
 
