@@ -11,8 +11,8 @@
       "customType": "regex",
       "depNameTemplate": "grafana/k6",
       "datasourceTemplate": "docker",
-      "fileMatch": [
-        "^integration/integration_test.go$",
+      "managerFilePatterns": [
+        "**/*_test.go",
       ],
       "matchStrings": [
         "grafana/k6:(?<currentValue>[\\w.-]+)",
