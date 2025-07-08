@@ -49,6 +49,11 @@ If we do not add that specific capability, chromium won't start as user namespac
 [0529/164805.302206:FATAL:zygote_host_impl_linux.cc(126)] No usable sandbox! Update your kernel or see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
 ```
 
+In more recent chromium versions the error instead becomes:
+```
+[13:13:0708/103542.786751:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:132] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+```
+
 Interestingly, the latter scenario does **not** reproduce in k8s: Chromium is able to start with the sandbox enabled, wihtout the `sys_admin` capability, and with the `/usr/lib/chromium/chrome-sandbox` helper being removed from the image:
 
 ```
