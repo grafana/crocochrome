@@ -12,92 +12,39 @@ The first route, which I believe is chromium's preferred one, may be worth elabo
 
 If the `chromium` process does not have the capability to create user namespaces, it will try to use a helper binary, called `/usr/lib/chromium/chrome-sandbox`. This helper has the setuid bit, so it will run as root regardless of the user who invokes this.
 
-We have verified that chromium will _not_ use this helper if it has `CAP_SYS_ADMIN`, by simply removing that file and trying to start chromium with the sandbox enabled: It runs without errors:
+## Summary of sandboxing strategies
 
-```Dockerfile
-FROM alpine:3.20.0
+| Stategy \ Location | Containerless     | Docker         | Kubernetes      |
+|--------------------|-------------------|----------------|-----------------|
+| User namespaces    | ️☑️<sup>1</sup>    | ❌<sup>2</sup> | ☑️<sup>3</sup>  |
+| Setuid helper      | ✅                | ❌<sup>4</sup> | ☑️<sup>5</sup>  |
 
-RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
-RUN apk --no-cache add chromium-swiftshader
-RUN rm /usr/lib/chromium/chrome-sandbox
+[1]: Known not to work in some linux distributions, namely Debian and Ubuntu, forbid the required syscalls for non-root users.
 
-USER k6
+[2]: Known not to work as Docker forbids the required syscalls via [seccomp policies](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile).
 
-ENTRYPOINT [ "chromium", "--headless", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=5222" ]
-```
+[3]: May or may not work depending on host kernel and CRI (see 1 and 2). Observed to work if host and CRI allows it (non-ubuntu, CRI-O).
 
-```
-# We have run rm /usr/lib/chromium/chrome-sandbox in this image.
-18:43:00 ~/Devel/crocochrome $> docker run -ti --rm --cap-add=sys_admin localhost:5000/browser:latest
-[0529/164303.395670:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-[0529/164303.395966:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-[0529/164303.395993:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-Fontconfig error: No writable cache directories
-[0529/164303.403245:INFO:config_dir_policy_loader.cc(118)] Skipping mandatory platform policies because no policy file was found at: /etc/chromium/policies/managed
-[0529/164303.403264:INFO:config_dir_policy_loader.cc(118)] Skipping recommended platform policies because no policy file was found at: /etc/chromium/policies/recommended
+[4]: Known to not work due to seccomp policies mentioned in [2] also applying, even after you become root through the setuid helper.
 
-DevTools listening on ws://0.0.0.0:5222/devtools/browser/b6f2885e-1f1b-4119-8182-12eea1bae20f
-[0529/164303.405298:WARNING:bluez_dbus_manager.cc(248)] Floss manager not present, cannot set Floss enable/disable.
-[0529/164303.410270:WARNING:sandbox_linux.cc(420)] InitializeSandbox() called with multiple threads in process gpu-process.
-```
+[5]: May or may not work depending on seccomp policies being present.
 
-If we do not add that specific capability, chromium won't start as user namespaces are not available in docker (more on this later):
+The table above applies to running with the default security options, which can be modified:
 
-```
-# We have run rm /usr/lib/chromium/chrome-sandbox in this image.
-18:47:58 ~/Devel/crocochrome $> docker run -ti --rm --cap-add=all --cap-drop=sys_admin localhost:5000/browser:latest
-[0529/164805.302206:FATAL:zygote_host_impl_linux.cc(126)] No usable sandbox! Update your kernel or see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
-```
+| Stategy \ Location | Docker, `seccomp=unconfined` |
+|--------------------|------------------------------|
+| User namespaces    | ️☑️<sup>1</sup>               |
+| Setuid helper      | ✅                           |
 
-In more recent chromium versions the error instead becomes:
-```
-[13:13:0708/103542.786751:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:132] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
-```
+[1]: Worked on a GitHub Actions runner, but may not work if the host kernel forbids the required syscall.
 
-Interestingly, the latter scenario does **not** reproduce in k8s: Chromium is able to start with the sandbox enabled, wihtout the `sys_admin` capability, and with the `/usr/lib/chromium/chrome-sandbox` helper being removed from the image:
+* Kubernetes `securityContext.seccompProfile.Unconfined`: TBD
+  * Should unblock the user namespaces route provided the host kernel supports them.
+  * Should ublock the setuid helper route regardless.
 
-```
-[0529/173417.131639:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-[0529/173417.132032:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-[0529/173417.132056:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
-[0529/173417.133214:ERROR:zygote_host_impl_linux.cc(273)] Failed to adjust OOM score of renderer with pid 29: Permission denied (13)
-Fontconfig error: No writable cache directories
-Fontconfig error: No writable cache directories
-[0529/173417.139017:INFO:config_dir_policy_loader.cc(118)] Skipping mandatory platform policies because no policy file was found at: /etc/chromium/policies/managed
-[0529/173417.139027:INFO:config_dir_policy_loader.cc(118)] Skipping recommended platform policies because no policy file was found at: /etc/chromium/policies/recommended
+Relaxing the containerization settings is, however, a security tradeoff.
 
-DevTools listening on ws://0.0.0.0:5222/devtools/browser/7bf56a77-f480-415e-996d-b6e1d9861362
-[0529/173417.140865:WARNING:bluez_dbus_manager.cc(248)] Floss manager not present, cannot set Floss enable/disable.
-[0529/173417.144703:WARNING:sandbox_linux.cc(420)] InitializeSandbox() called with multiple threads in process gpu-process.
-```
-
-The logs above are produced by the following pod:
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: chromium
-  labels:
-    app.kubernetes.io/name: chromium
-spec:
-  securityContext:
-    runAsUser: 6666
-    runAsGroup: 6666
-    fsGroup: 6666
-  containers:
-    - name: chromium-tip
-      image: localhost:5000/browser # Same image as we ran with docker
-      imagePullPolicy: Always
-      securityContext:
-        runAsNonRoot: true
-        readOnlyRootFilesystem: true
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop: ["all"]
-```
-
-## How chromium sandboxes stuff
+## How chromium decides on a sandboxing strategy
 
 Chromium can sandbox processes on linux in several different ways. Other than itself running with elevated privilages, the two remaning ones are either using helper binary with the `setuid` bit set (`/usr/lib/chromium/chrome-sandbox`), or using user namespaces. There's evidence of this here:
 <https://github.com/chromium/chromium/blob/ebb9dbcfdb158f1d45ef1c4ecab2c5a143c90355/sandbox/policy/linux/sandbox_linux.h#L46-L49>
@@ -182,8 +129,96 @@ cat /proc/sys/kernel/unprivileged_userns_clone
 
 But docker denies somewhere on its own [seccomp policies](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile). CRI-O, and possibly containerd, do not deny this, as reported [here](https://github.com/cgwalters/container-cve-2021-22555/blob/main/README.md#note-criopodman-runtimedefault-policy-vs-docker) ([archive.org](https://web.archive.org/web/20240530113241/https://github.com/cgwalters/container-cve-2021-22555/blob/main/README.md#note-criopodman-runtimedefault-policy-vs-docker)).
 
-This is verifying by asserting that this successfuly launch chromium, with the setuid'd binary removed:
+This is verified by asserting that this successfuly launch chromium, with the setuid'd binary removed:
 
 ```console
 docker run -ti --rm --cap-drop=all --security-opt seccomp=unconfined localhost:5000/browser:latest
 ```
+
+
+
+As for the setuid helper, ee have verified that chromium will _not_ use this helper if it has `CAP_SYS_ADMIN`, by simply removing that file and trying to start chromium with the sandbox enabled: It runs without errors:
+
+```Dockerfile
+FROM alpine:3.20.0
+
+RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
+RUN apk --no-cache add chromium-swiftshader
+RUN rm /usr/lib/chromium/chrome-sandbox
+
+USER k6
+
+ENTRYPOINT [ "chromium", "--headless", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=5222" ]
+```
+
+```
+# We have run rm /usr/lib/chromium/chrome-sandbox in this image.
+18:43:00 ~/Devel/crocochrome $> docker run -ti --rm --cap-add=sys_admin localhost:5000/browser:latest
+[0529/164303.395670:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+[0529/164303.395966:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+[0529/164303.395993:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+Fontconfig error: No writable cache directories
+[0529/164303.403245:INFO:config_dir_policy_loader.cc(118)] Skipping mandatory platform policies because no policy file was found at: /etc/chromium/policies/managed
+[0529/164303.403264:INFO:config_dir_policy_loader.cc(118)] Skipping recommended platform policies because no policy file was found at: /etc/chromium/policies/recommended
+
+DevTools listening on ws://0.0.0.0:5222/devtools/browser/b6f2885e-1f1b-4119-8182-12eea1bae20f
+[0529/164303.405298:WARNING:bluez_dbus_manager.cc(248)] Floss manager not present, cannot set Floss enable/disable.
+[0529/164303.410270:WARNING:sandbox_linux.cc(420)] InitializeSandbox() called with multiple threads in process gpu-process.
+```
+
+If we do not add that specific capability, chromium won't start as user namespaces are not available in docker (more on this later):
+
+```
+# We have run rm /usr/lib/chromium/chrome-sandbox in this image.
+18:47:58 ~/Devel/crocochrome $> docker run -ti --rm --cap-add=all --cap-drop=sys_admin localhost:5000/browser:latest
+[0529/164805.302206:FATAL:zygote_host_impl_linux.cc(126)] No usable sandbox! Update your kernel or see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+```
+
+In more recent chromium versions the error instead becomes:
+```
+[13:13:0708/103542.786751:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:132] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+```
+
+Interestingly, the latter scenario does **not** reproduce in k8s: Chromium is able to start with the sandbox enabled, wihtout the `sys_admin` capability, and with the `/usr/lib/chromium/chrome-sandbox` helper being removed from the image:
+
+```
+[0529/173417.131639:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+[0529/173417.132032:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+[0529/173417.132056:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /var/run/dbus/system_bus_socket: No such file or directory
+[0529/173417.133214:ERROR:zygote_host_impl_linux.cc(273)] Failed to adjust OOM score of renderer with pid 29: Permission denied (13)
+Fontconfig error: No writable cache directories
+Fontconfig error: No writable cache directories
+[0529/173417.139017:INFO:config_dir_policy_loader.cc(118)] Skipping mandatory platform policies because no policy file was found at: /etc/chromium/policies/managed
+[0529/173417.139027:INFO:config_dir_policy_loader.cc(118)] Skipping recommended platform policies because no policy file was found at: /etc/chromium/policies/recommended
+
+DevTools listening on ws://0.0.0.0:5222/devtools/browser/7bf56a77-f480-415e-996d-b6e1d9861362
+[0529/173417.140865:WARNING:bluez_dbus_manager.cc(248)] Floss manager not present, cannot set Floss enable/disable.
+[0529/173417.144703:WARNING:sandbox_linux.cc(420)] InitializeSandbox() called with multiple threads in process gpu-process.
+```
+
+The logs above are produced by the following pod:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: chromium
+  labels:
+    app.kubernetes.io/name: chromium
+spec:
+  securityContext:
+    runAsUser: 6666
+    runAsGroup: 6666
+    fsGroup: 6666
+  containers:
+    - name: chromium-tip
+      image: localhost:5000/browser # Same image as we ran with docker
+      imagePullPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["all"]
+```
+
