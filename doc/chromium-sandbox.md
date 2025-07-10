@@ -1,5 +1,18 @@
 # On chromium sandboxing
 
+## Executive summary on chromium sandboxing inside containers
+
+The mechanisms chromium uses to create its sandbox are the same on which containers work, and more importantly, also the same that [container escape](https://www.aquasec.com/cloud-native-academy/container-security/container-escape/) vulnerabilities rely on. For this reason, container runtimes block this mechanisms inside containers.
+
+To allow chromium to run its sandbox one must relax certain security mechanisms of the container runtime itself, and conversely, to preserve the security benefits of the container runtime one must disable the chromium sandbox. The options that we have are:
+1. `seccomp=unconfined`: Put more steam on preventing escapes from the chromium sandbox, knowing if that happens it *might* be easier for jump to the host.
+2. `--no-sandbox`: Put more steam on preventing the code from escaping the container, knowing if that happens it *might* be easier to escape from the chromium sandbox to the container (but not to the host).
+3. Invest significant resources in security research and maintenance, aiming to produce a seccomp profile that manages to allow the chromium sandbox to work, but still makes harder escaping from the container.
+
+Historically, for synthetic monitoring and this repo, we have picked option 2.
+
+## Summary of sandboxing strategies
+
 Being a web browser, chromium implements a series of security measures to try and isolate individual processes that run external code (javascript). This functionality is on by default, an can be disabled by launching chromium with `--no-sandbox`.
 
 On linux, chromium achieves this isolation by creating new PID and network namespaces to child processes using [clone with `CLONE_NEWPID | CLONE_NEWNET`](https://man7.org/linux/man-pages/man2/clone.2.html). These flags are normally privileged, meaning that unprivileged processes are not allowed to use them. Chromium tries multiple mechanisms to get access to them:
@@ -12,7 +25,7 @@ The first route, which I believe is chromium's preferred one, may be worth elabo
 
 If the `chromium` process does not have the capability to create user namespaces, it will try to use a helper binary, called `/usr/lib/chromium/chrome-sandbox`. This helper has the setuid bit, so it will run as root regardless of the user who invokes this.
 
-## Summary of sandboxing strategies
+## Chromium sandbox compatibility with containers
 
 | Stategy \ Location | Containerless     | Docker         | Kubernetes      |
 |--------------------|-------------------|----------------|-----------------|
@@ -23,11 +36,11 @@ If the `chromium` process does not have the capability to create user namespaces
 
 [2]: Known not to work as Docker forbids the required syscalls via [seccomp policies](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile).
 
-[3]: May or may not work depending on host kernel and CRI (see 1 and 2). Observed to work if host and CRI allows it (non-ubuntu, CRI-O).
+[3]: May or may not work depending on host kernel and CRI settings (see 1 and 2). Observed to work if host and CRI allows it (Arch linux, CRI-O).
 
 [4]: Known to not work due to seccomp policies mentioned in [2] also applying, even after you become root through the setuid helper.
 
-[5]: May or may not work depending on seccomp policies being present.
+[5]: May or may not work depending on CRI settings. Observed to work with CRI-O.
 
 The table above applies to running with the default security options, which can be modified:
 
@@ -43,6 +56,7 @@ The table above applies to running with the default security options, which can 
   * Should ublock the setuid helper route regardless.
 
 Relaxing the containerization settings is, however, a security tradeoff.
+
 
 ## How chromium decides on a sandboxing strategy
 
