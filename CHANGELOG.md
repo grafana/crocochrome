@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.3](https://github.com/grafana/crocochrome/compare/v0.6.2...v0.6.3) (2025-07-10)
+
+
+### Miscellaneous Chores
+
+* renovate: replace fileMatch with managerFilePatterns ([7d7c91d](https://github.com/grafana/crocochrome/commit/7d7c91deb972dcb7907cdea0de598a9322da81c3))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:138.0.7204.93-r0-3.22.0 Docker digest to 342d53b ([#235](https://github.com/grafana/crocochrome/issues/235)) ([338cd76](https://github.com/grafana/crocochrome/commit/338cd7608aa2d0c8557d7957869633a4598fb8ae))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.9.0 ([#233](https://github.com/grafana/crocochrome/issues/233)) ([da79aa0](https://github.com/grafana/crocochrome/commit/da79aa00ab122e0c997dd186e12d1facde533e3c))
+
 ## [0.6.2](https://github.com/grafana/crocochrome/compare/v0.6.1...v0.6.2) (2025-07-07)
 
 
