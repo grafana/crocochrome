@@ -151,7 +151,7 @@ docker run -ti --rm --cap-drop=all --security-opt seccomp=unconfined localhost:5
 
 
 
-As for the setuid helper, ee have verified that chromium will _not_ use this helper if it has `CAP_SYS_ADMIN`, by simply removing that file and trying to start chromium with the sandbox enabled: It runs without errors:
+As for the setuid helper, we have verified that chromium will _not_ use this helper if it has `CAP_SYS_ADMIN`, by simply removing that file and trying to start chromium with the sandbox enabled. It runs without errors:
 
 ```Dockerfile
 FROM alpine:3.20.0
