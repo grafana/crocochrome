@@ -143,7 +143,7 @@ cat /proc/sys/kernel/unprivileged_userns_clone
 
 But docker denies somewhere on its own [seccomp policies](https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile). CRI-O, and possibly containerd, do not deny this, as reported [here](https://github.com/cgwalters/container-cve-2021-22555/blob/main/README.md#note-criopodman-runtimedefault-policy-vs-docker) ([archive.org](https://web.archive.org/web/20240530113241/https://github.com/cgwalters/container-cve-2021-22555/blob/main/README.md#note-criopodman-runtimedefault-policy-vs-docker)).
 
-This is verified by asserting that this successfuly launch chromium, with the setuid'd binary removed:
+This is verified by asserting that this successfully launches chromium, with the setuid'd binary removed:
 
 ```console
 docker run -ti --rm --cap-drop=all --security-opt seccomp=unconfined localhost:5000/browser:latest
