@@ -53,7 +53,7 @@ The table above applies to running with the default security options, which can 
 
 * Kubernetes `securityContext.seccompProfile.Unconfined`: TBD
   * Should unblock the user namespaces route provided the host kernel supports them.
-  * Should ublock the setuid helper route regardless.
+  * Should unblock the setuid helper route regardless.
 
 Relaxing the containerization settings is, however, a security tradeoff.
 
