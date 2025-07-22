@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.3](https://github.com/grafana/crocochrome/compare/v0.6.2...v0.6.3) (2025-07-22)
+
+
+### Miscellaneous Chores
+
+* doc: document more sandbox experiments, add summary table ([#229](https://github.com/grafana/crocochrome/issues/229)) ([75519e8](https://github.com/grafana/crocochrome/commit/75519e8fa9f933498cc1593c570cc1ec2f6ab795))
+* renovate: replace fileMatch with managerFilePatterns ([7d7c91d](https://github.com/grafana/crocochrome/commit/7d7c91deb972dcb7907cdea0de598a9322da81c3))
+* Update dependency go to v1.24.5 ([dadfe76](https://github.com/grafana/crocochrome/commit/dadfe7645b8c3c39ab5dae819327fead2ef36c88))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v138.0.7204.157-r0-3.22.1 ([9b3572e](https://github.com/grafana/crocochrome/commit/9b3572ecaa10cb0556c616c6c20f7d8fbedeb082))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v138.0.7204.93-r0-3.22.1 ([#238](https://github.com/grafana/crocochrome/issues/238)) ([eec1f3d](https://github.com/grafana/crocochrome/commit/eec1f3d0f56f70acaa85a3a086d4491856f39b95))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:138.0.7204.93-r0-3.22.0 Docker digest to 342d53b ([#235](https://github.com/grafana/crocochrome/issues/235)) ([338cd76](https://github.com/grafana/crocochrome/commit/338cd7608aa2d0c8557d7957869633a4598fb8ae))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.10.0 ([#236](https://github.com/grafana/crocochrome/issues/236)) ([5388904](https://github.com/grafana/crocochrome/commit/53889046a40540c19b105b824ffd38868737b215))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.9.0 ([#233](https://github.com/grafana/crocochrome/issues/233)) ([da79aa0](https://github.com/grafana/crocochrome/commit/da79aa00ab122e0c997dd186e12d1facde533e3c))
+* Update module github.com/testcontainers/testcontainers-go to v0.38.0 ([#237](https://github.com/grafana/crocochrome/issues/237)) ([15593be](https://github.com/grafana/crocochrome/commit/15593be38bccc6ed4cbd44ec9f017b46696cab38))
+
 ## [0.6.2](https://github.com/grafana/crocochrome/compare/v0.6.1...v0.6.2) (2025-07-07)
 
 
