@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4](https://github.com/grafana/crocochrome/compare/v0.6.3...v0.6.4) (2025-08-01)
+
+
+### Miscellaneous Chores
+
+* Update module github.com/prometheus/client_golang to v1.23.0 ([#240](https://github.com/grafana/crocochrome/issues/240)) ([e4925a0](https://github.com/grafana/crocochrome/commit/e4925a0a3815baee02db16aafc29f05420d00fc6))
+
 ## [0.6.3](https://github.com/grafana/crocochrome/compare/v0.6.2...v0.6.3) (2025-07-22)
 
 
