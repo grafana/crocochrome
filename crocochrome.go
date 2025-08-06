@@ -311,7 +311,20 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
-	err = cmd.Run()
+	// Start process, start monitor, then wait for it to finish.
+	err = func() error {
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("starting chromium: %w", err)
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			return fmt.Errorf("running chromium: %w", err)
+		}
+
+		return nil
+	}()
 
 	attrs := make([]slog.Attr, 0, 9)
 
