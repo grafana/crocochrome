@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.5](https://github.com/grafana/crocochrome/compare/v0.6.4...v0.6.5) (2025-08-15)
+
+
+### Miscellaneous Chores
+
+* Update actions/checkout action to v4.3.0 ([#250](https://github.com/grafana/crocochrome/issues/250)) ([24d3c61](https://github.com/grafana/crocochrome/commit/24d3c61c538e565bc252fa7cd9016c8a0e1916c4))
+* Update actions/checkout action to v5 ([#251](https://github.com/grafana/crocochrome/issues/251)) ([1057e49](https://github.com/grafana/crocochrome/commit/1057e49aa17e485a2814dccdb226fdf8e5d9c302))
+* Update actions/checkout digest to 08eba0b ([#249](https://github.com/grafana/crocochrome/issues/249)) ([2cc19cc](https://github.com/grafana/crocochrome/commit/2cc19ccecfa1dd498d8f6aa7a848c0e660565449))
+* Update actions/create-github-app-token digest to a8d6161 ([#248](https://github.com/grafana/crocochrome/issues/248)) ([e9628b4](https://github.com/grafana/crocochrome/commit/e9628b4a91f7b981336d4f8b111f917ea600accb))
+* Update docker/login-action digest to 184bdaa ([#243](https://github.com/grafana/crocochrome/issues/243)) ([494e41b](https://github.com/grafana/crocochrome/commit/494e41bd5ae1c94b006352c400d367ac18a828b5))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v139 ([#252](https://github.com/grafana/crocochrome/issues/252)) ([222476b](https://github.com/grafana/crocochrome/commit/222476b47edaf72c853a7f3cc980aaf85bd51e52))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:138.0.7204.157-r0-3.22.1 Docker digest to 340d57b ([#245](https://github.com/grafana/crocochrome/issues/245)) ([a0d515c](https://github.com/grafana/crocochrome/commit/a0d515ca8b4658c62c3ef0de912b136b02835191))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.12.0 ([#242](https://github.com/grafana/crocochrome/issues/242)) ([9d92be8](https://github.com/grafana/crocochrome/commit/9d92be8d8cfab930a52f180ad6108a250b0eb076))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.12.1 ([#247](https://github.com/grafana/crocochrome/issues/247)) ([1364fe6](https://github.com/grafana/crocochrome/commit/1364fe69036f112e9b8babc82d8a1bd0e689eaa3))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.13.0 ([#254](https://github.com/grafana/crocochrome/issues/254)) ([6d5b131](https://github.com/grafana/crocochrome/commit/6d5b131255cb5a163d30f2db0438156d1b1484a3))
+* Update grafana/k6 Docker tag to v1.2.1 ([#253](https://github.com/grafana/crocochrome/issues/253)) ([4258c67](https://github.com/grafana/crocochrome/commit/4258c6783949de091545d5f142623d1a6ef0858f))
+
 ## [0.6.4](https://github.com/grafana/crocochrome/compare/v0.6.3...v0.6.4) (2025-08-01)
 
 
