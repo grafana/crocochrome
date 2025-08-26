@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/grafana/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
@@ -54,6 +55,9 @@ func TestIntegration(t *testing.T) {
 			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
 			// and be writable.
 			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.SecurityOpt = append(hc.SecurityOpt, "seccomp=unconfined")
+			},
 		},
 	})
 	testcontainers.CleanupContainer(t, cc)
