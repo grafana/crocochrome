@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.6](https://github.com/grafana/crocochrome/compare/v0.6.5...v0.6.6) (2025-08-27)
+
+
+### Miscellaneous Chores
+
+* renovate: pivot to platform-managed renovate ([6e5dd1e](https://github.com/grafana/crocochrome/commit/6e5dd1e81f1a98d177892a5cbc31c415251a9c20))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:139.0.7258.66-r0-3.22.1 Docker digest to 3e6e533 ([72b2bd3](https://github.com/grafana/crocochrome/commit/72b2bd35b542abaf5b44012d524c459fcd281526))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.14.0 ([#256](https://github.com/grafana/crocochrome/issues/256)) ([69f37f5](https://github.com/grafana/crocochrome/commit/69f37f580306c542d49a9b7ed246ef1e1e5c783f))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.15.0 ([#263](https://github.com/grafana/crocochrome/issues/263)) ([927ffa8](https://github.com/grafana/crocochrome/commit/927ffa8099701ff74473dabc8d3fdc55dbf72d18))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.16.0 ([#264](https://github.com/grafana/crocochrome/issues/264)) ([7399389](https://github.com/grafana/crocochrome/commit/7399389afe994e6a542cfcbdf7eae1cc4679547a))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.16.1 ([#265](https://github.com/grafana/crocochrome/issues/265)) ([28d09ea](https://github.com/grafana/crocochrome/commit/28d09ea204ad4f3a9df179863f768c2705ee8444))
+* Update googleapis/release-please-action digest to c2a5a2b ([#262](https://github.com/grafana/crocochrome/issues/262)) ([fd859a5](https://github.com/grafana/crocochrome/commit/fd859a5ac93a5cffa1d630d3f711f7809ef3bdc4))
+* Update grafana/k6 Docker tag to v1.2.2 ([#258](https://github.com/grafana/crocochrome/issues/258)) ([ffaca5b](https://github.com/grafana/crocochrome/commit/ffaca5be3c2ddd7fbc27fa5d379a62cd63b05b6f))
+* Update grafana/k6 Docker tag to v1.2.3 ([#266](https://github.com/grafana/crocochrome/issues/266)) ([ce79313](https://github.com/grafana/crocochrome/commit/ce793132000adabfbf5bc339651bb3eccdd197b6))
+* Update module github.com/docker/docker to v28.3.3+incompatible [SECURITY] ([#260](https://github.com/grafana/crocochrome/issues/260)) ([3250806](https://github.com/grafana/crocochrome/commit/3250806eda0e5908fd6e7221c918f02f2b58fa17))
+
 ## [0.6.5](https://github.com/grafana/crocochrome/compare/v0.6.4...v0.6.5) (2025-08-15)
 
 
