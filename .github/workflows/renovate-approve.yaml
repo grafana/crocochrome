@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     # Do not bother running if PR is not authored by grafanarenovatebot.
     # https://woodruffw.github.io/zizmor/audits/#bot-conditions
-    if: github.event.pull_request.user.login == 'grafanarenovatebot[bot]' && github.repository == github.event.pull_request.head.repo.full_name
+    if: github.event.pull_request.user.login == 'renovate-sh-app[bot]' && github.repository == github.event.pull_request.head.repo.full_name
     steps:
       - uses: grafana/sm-renovate/actions/renovate-approve@ecc1aafe784c746167edb9966bf5c27330fab705
+        with:
+          renovate-user: 'renovate-sh-app[bot]'
