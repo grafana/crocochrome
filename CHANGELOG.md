@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.8](https://github.com/grafana/crocochrome/compare/v0.6.7...v0.6.8) (2025-09-05)
+
+
+### Fixes
+
+* renovate-approve: use target platform-managed renovate ([3f89964](https://github.com/grafana/crocochrome/commit/3f8996433c55040ac8edfa58d58896f3f6d688d3))
+
+
+### Miscellaneous Chores
+
+* add renovate-approve workflow ([fe2b635](https://github.com/grafana/crocochrome/commit/fe2b635c6a699231429ac36cb58358e5c042313f))
+* renovate-approve: pin digest ([386c15b](https://github.com/grafana/crocochrome/commit/386c15ba066a8ef9ece275e368114be58bd4d8ac))
+* renovate: include grafana-build-tools preset ([#275](https://github.com/grafana/crocochrome/issues/275)) ([ba39cd8](https://github.com/grafana/crocochrome/commit/ba39cd8129ae4fca7276f735429c22f3dd0dfddc))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.18.1 ([#271](https://github.com/grafana/crocochrome/issues/271)) ([e68cb8c](https://github.com/grafana/crocochrome/commit/e68cb8c19eaed8aa72ff538f5688c6cb2cc58a63))
+* Update module github.com/prometheus/client_golang to v1.23.1 ([#276](https://github.com/grafana/crocochrome/issues/276)) ([1ba646a](https://github.com/grafana/crocochrome/commit/1ba646a691f4ac6236c065f5b65ca2caf53923fa))
+
 ## [0.6.7](https://github.com/grafana/crocochrome/compare/v0.6.6...v0.6.7) (2025-08-30)
 
 
