@@ -2,7 +2,7 @@ module github.com/grafana/crocochrome
 
 go 1.23.0
 
-toolchain go1.24.5
+toolchain go1.25.0
 
 require (
 	github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
