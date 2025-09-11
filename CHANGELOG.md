@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.9](https://github.com/grafana/crocochrome/compare/v0.6.8...v0.6.9) (2025-09-11)
+
+
+### Miscellaneous Chores
+
+* Update actions/setup-go action to v6 ([8e09b44](https://github.com/grafana/crocochrome/commit/8e09b44564dbfaa5bfa9b419e6893effcc676c2c))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:139.0.7258.154-r0-3.22.1 Docker digest to 59612ba ([#283](https://github.com/grafana/crocochrome/issues/283)) ([c45b4b3](https://github.com/grafana/crocochrome/commit/c45b4b35127485dabcc78150863d155d7e723335))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:139.0.7258.154-r0-3.22.1 Docker digest to 6b2ac21 ([fce1dd0](https://github.com/grafana/crocochrome/commit/fce1dd0cb1782d3b0b56a3431970ba06f08e4d02))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1 ([9a50d15](https://github.com/grafana/crocochrome/commit/9a50d15993157b39a4b013b6f5432526dddca1e9))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.19.0 ([#284](https://github.com/grafana/crocochrome/issues/284)) ([79a35ea](https://github.com/grafana/crocochrome/commit/79a35ea9c82b5ae785df389091f53acc88bfdac1))
+* Update grafana/sm-renovate digest to b61cb8e ([a6369a5](https://github.com/grafana/crocochrome/commit/a6369a5b97d5888bba29c465f0864b2618ba7ed3))
+* Update module github.com/prometheus/client_golang to v1.23.2 ([ff914e2](https://github.com/grafana/crocochrome/commit/ff914e2c23bc9a61df40bd7b3158b45647557b17))
+
 ## [0.6.8](https://github.com/grafana/crocochrome/compare/v0.6.7...v0.6.8) (2025-09-05)
 
 
