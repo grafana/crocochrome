@@ -30,9 +30,13 @@ RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 RUN apk --no-cache add --repository community tini
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
-# potential attack surface, we get rid of any file that has the setuid bit set, such as
-# /usr/lib/chromium/chrome-sandbox.
-RUN find / -type f -perm -4000 -delete
+# potential attack surface, we get rid of any file that has the setuid bit set. As an exception, we keep it on
+# /usr/lib/chromium/chrome-sandbox, which we need for portability.
+RUN <<EOF
+  set -e
+  find / -type f -perm -4000 -print0 | xargs -0 -n 32 chmod -s
+  chmod +s /usr/lib/chromium/chrome-sandbox
+EOF
 
 # The crocochrome binary has extra capabilities, so we make sure only the k6 user (and not nobody) can run it.
 COPY --from=setcapper --chown=k6:k6 --chmod=0500 /usr/local/bin/crocochrome /usr/local/bin/crocochrome
