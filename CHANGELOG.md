@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.13](https://github.com/grafana/crocochrome/compare/v0.6.12...v0.6.13) (2025-10-24)
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v141.0.7390.107-r0-3.22.2 ([161badf](https://github.com/grafana/crocochrome/commit/161badf03ed3915aa918aa5adea66992cbae510f))
+* Update googleapis/release-please-action digest to 16a9c90 ([a933668](https://github.com/grafana/crocochrome/commit/a93366870e0aa47ce6e7547d5ef7241cfcbb28f8))
+* Update grafana/sm-renovate digest to e4d1d1f ([#309](https://github.com/grafana/crocochrome/issues/309)) ([9aa6f25](https://github.com/grafana/crocochrome/commit/9aa6f2586e55d1fec8ae3c8a82330bb383ecc420))
+
 ## [0.6.12](https://github.com/grafana/crocochrome/compare/v0.6.11...v0.6.12) (2025-10-15)
 
 
