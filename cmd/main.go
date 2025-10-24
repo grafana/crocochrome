@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/grafana/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/http"
@@ -18,6 +19,17 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	jitlessPercent := int64(0)
+	if jitlessPercentStr := os.Getenv("JITLESS_PERCENT"); jitlessPercentStr != "" {
+		var err error
+		jitlessPercent, err = strconv.ParseInt(jitlessPercentStr, 10, 64)
+		if err != nil || jitlessPercent < 0 || jitlessPercent > 100 {
+			logger.Error("JITLESS_PERCENT must be an integer in the [0-100] range", "JITLESS_PERCENT", jitlessPercentStr)
+			os.Exit(1)
+			return
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	registry := prometheus.NewRegistry()
@@ -30,9 +42,10 @@ func main() {
 		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
 		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
 		// because we told it to.
-		TempDir:      "/chromium-tmp",
-		Registry:     registry,
-		ExtraUATerms: "GrafanaSyntheticMonitoring",
+		TempDir:        "/chromium-tmp",
+		Registry:       registry,
+		ExtraUATerms:   "GrafanaSyntheticMonitoring",
+		JitlessPercent: jitlessPercent,
 	})
 
 	err := supervisor.ComputeUserAgent(context.Background())

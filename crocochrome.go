@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"math/big"
 	"net"
 	"os"
 	"os/exec"
@@ -61,6 +62,9 @@ type Options struct {
 	// ExtraUATerms is appended, after a space, to the chromium user agent. It can be used to add vendor-specific
 	// information to it, such as the name of the product using chromium to perform requests.
 	ExtraUATerms string
+	// Percentage [0-100] of sessions to start passing `--jitless` to Chromium/v8.
+	// Jitless mode is a bit slower but also heavily reduces attack surface area.
+	JitlessPercent int64
 }
 
 const (
@@ -283,6 +287,11 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 			args,
 			"--user-agent="+s.userAgent,
 		)
+	}
+
+	if jitlessRoll, _ := rand.Int(rand.Reader, big.NewInt(100)); jitlessRoll.Int64() < s.opts.JitlessPercent {
+		logger.Warn("Session will use jitless mode", "JitlessPercent", s.opts.JitlessPercent)
+		args = append(args, `--js-flags=--jitless`)
 	}
 
 	cmd := exec.CommandContext(ctx,
