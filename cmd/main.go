@@ -85,7 +85,7 @@ func run(logger *slog.Logger, config *Config) error {
 	server := crocohttp.New(logger, supervisor)
 	instrumentedServer := metrics.InstrumentHTTP(registry, server)
 	// This adds the bits, but doesn't get the bytes
-	registry.Register(collectors.NewBuildInfoCollector())
+	registry.MustRegister(collectors.NewBuildInfoCollector())
 
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
