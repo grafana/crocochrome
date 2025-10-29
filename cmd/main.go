@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -27,11 +28,11 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
-	config := &Config{
-		UserGroup: 65534,
-		TempDir:   "/chromium-tmp",
-	}
+	config := &Config{}
+	flag.StringVar(&config.TempDir, "temp-dir", "/chromium-tmp", "Directory for chromiumium instances to write their data to")
+	flag.IntVar(&config.UserGroup, "user-group", 65534, "Default user to run as. For local development, set this flag to 0")
 
+	flag.Parse()
 	if err := run(logger, config); err != nil {
 		logger.Error("run failed to execute",
 			slog.String("msg", err.Error()))
