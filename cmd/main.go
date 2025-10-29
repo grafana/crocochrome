@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,6 +22,13 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	if err := run(logger); err != nil {
+		logger.Error("run failed to execute",
+			slog.String("msg", err.Error()))
+	}
+}
+
+func run(logger *slog.Logger) error {
 	logger.LogAttrs(context.Background(), slog.LevelInfo, "Starting crocochrome supervisor",
 		slog.String("version", version.Short()),
 		slog.String("commit", version.Commit()),
@@ -60,9 +68,7 @@ func main() {
 
 	err := supervisor.ComputeUserAgent(context.Background())
 	if err != nil {
-		logger.Error("Computing user agent", "err", err)
-		os.Exit(1)
-		return
+		return fmt.Errorf("could not compute user agent: %w", err)
 	}
 
 	server := crocohttp.New(logger, supervisor)
@@ -79,6 +85,7 @@ func main() {
 
 	err = http.ListenAndServe(address, mux)
 	if err != nil {
-		logger.Error("Setting up HTTP listener", "err", err)
+		return fmt.Errorf("could not set up HTTP listener: %w", err)
 	}
+	return nil
 }
