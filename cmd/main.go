@@ -8,8 +8,11 @@ import (
 
 	"github.com/grafana/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/http"
+	"github.com/grafana/crocochrome/internal/version"
+
 	"github.com/grafana/crocochrome/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -18,9 +21,29 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "Starting crocochrome supervisor",
+		slog.String("version", version.Short()),
+		slog.String("commit", version.Commit()),
+		slog.String("timestamp", version.Buildstamp()),
+	)
+
 	mux := http.NewServeMux()
 
 	registry := prometheus.NewRegistry()
+
+	registry.MustRegister(prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "sm",
+			Subsystem: "crocochrome",
+			Name:      "info",
+			Help:      "Crocochrome Info",
+			ConstLabels: prometheus.Labels{
+				"version":   version.Short(),
+				"commit":    version.Commit(),
+				"timestamp": version.Buildstamp(),
+			},
+		},
+	))
 
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
@@ -44,8 +67,11 @@ func main() {
 
 	server := crocohttp.New(logger, supervisor)
 	instrumentedServer := metrics.InstrumentHTTP(registry, server)
+	// This adds the bits, but doesn't get the bytes
+	registry.Register(collectors.NewBuildInfoCollector())
 
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+
 	mux.Handle("/", instrumentedServer)
 
 	const address = ":8080"
