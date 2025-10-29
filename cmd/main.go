@@ -17,18 +17,28 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type Config struct {
+	UserGroup int
+	TempDir   string
+}
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 
-	if err := run(logger); err != nil {
+	config := &Config{
+		UserGroup: 65534,
+		TempDir:   "/chromium-tmp",
+	}
+
+	if err := run(logger, config); err != nil {
 		logger.Error("run failed to execute",
 			slog.String("msg", err.Error()))
 	}
 }
 
-func run(logger *slog.Logger) error {
+func run(logger *slog.Logger, config *Config) error {
 	logger.LogAttrs(context.Background(), slog.LevelInfo, "Starting crocochrome supervisor",
 		slog.String("version", version.Short()),
 		slog.String("commit", version.Commit()),
@@ -56,12 +66,12 @@ func run(logger *slog.Logger) error {
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
 		// Id for nobody user and group on alpine.
-		UserGroup: 65534,
+		UserGroup: config.UserGroup,
 		// In production we mount an emptyDir here, as opposed to /tmp, and configure chromium to write everything in
 		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
 		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
 		// because we told it to.
-		TempDir:      "/chromium-tmp",
+		TempDir:      config.TempDir,
 		Registry:     registry,
 		ExtraUATerms: "GrafanaSyntheticMonitoring",
 	})
