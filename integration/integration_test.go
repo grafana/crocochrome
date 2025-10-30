@@ -171,6 +171,13 @@ func TestIntegration(t *testing.T) {
 				if !regexp.MustCompile(testRegex).MatchString(line) {
 					t.Fatalf("Metric does not match regex:\nmetric:\n  %s\nregex:\n  %s", line, testRegex)
 				}
+				// validate the value is actually set to 1
+				value := strings.SplitAfter(line, " ")
+				metricValue := value[len(value)-1]
+				if metricValue != "1" {
+					t.Fatalf("Metric should be 1, got: %s", metricValue)
+				}
+
 			}
 
 			return // Test succeeded.

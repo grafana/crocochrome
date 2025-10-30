@@ -57,6 +57,10 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 			},
 		},
 	)
+
+	// make sure the value is always one
+	info.Set(1)
+
 	reg.MustRegister(requests)
 	reg.MustRegister(duration)
 	reg.MustRegister(info)
