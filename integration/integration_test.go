@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -136,6 +138,51 @@ func TestIntegration(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("version metric is sane", func(t *testing.T) {
+		resp, err := http.Get(endpoint + "/metrics")
+		if err != nil {
+			t.Fatalf("requesting /metrics: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("/metrics returned non-200 status %d", resp.StatusCode)
+		}
+
+		//nolint:errcheck // Test code.
+		defer resp.Body.Close()
+
+		const versionMetric = "sm_crocochrome_info"
+
+		scn := bufio.NewScanner(resp.Body)
+		for scn.Scan() {
+			line := scn.Text()
+
+			if !strings.HasPrefix(line, versionMetric) {
+				continue
+			}
+
+			// We found the version metric.
+			for _, testRegex := range []string{
+				`version="v\d+\.\d+\.\d+[^,]*"`,
+				`commit="[0-9a-f]{40}"`,
+				`timestamp="20\d\d-[^,]+"`, // TODO: Fix before year 2099.
+			} {
+				if !regexp.MustCompile(testRegex).MatchString(line) {
+					t.Fatalf("Metric does not match regex:\nmetric:\n  %s\nregex:\n  %s", line, testRegex)
+				}
+			}
+
+			return // Test succeeded.
+		}
+
+		if err := scn.Err(); err != nil {
+			t.Fatalf("reading /metrics body: %v", err)
+		}
+
+		// We should have returned in the scanner loop.
+		t.Fatalf("version metric not found")
+	})
 }
 
 // createSession calls the crocochrome API to create a session, starting a chromium process and retrieving its WS URL.
