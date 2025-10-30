@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/grafana/crocochrome/compare/v0.6.13...v0.7.0) (2025-10-30)
+
+
+### Features
+
+* Emit sm_crocochrome_info metric with vcs labels ([#315](https://github.com/grafana/crocochrome/issues/315)) ([5b3a9f8](https://github.com/grafana/crocochrome/commit/5b3a9f884b962420f4ac9299cc60e2ebfb296383))
+
 ## [0.6.13](https://github.com/grafana/crocochrome/compare/v0.6.12...v0.6.13) (2025-10-24)
 
 
