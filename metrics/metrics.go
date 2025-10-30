@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/grafana/crocochrome/internal/version"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -43,8 +44,26 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 		[]string{"code"},
 	)
 
+	info := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: "sm",
+			Subsystem: "crocochrome",
+			Name:      "info",
+			Help:      "Crocochrome Info",
+			ConstLabels: prometheus.Labels{
+				"version":   version.Short(),
+				"commit":    version.Commit(),
+				"timestamp": version.Buildstamp(),
+			},
+		},
+	)
+
+	// make sure the value is always one
+	info.Set(1)
+
 	reg.MustRegister(requests)
 	reg.MustRegister(duration)
+	reg.MustRegister(info)
 
 	handler = promhttp.InstrumentHandlerCounter(requests, handler)
 	handler = promhttp.InstrumentHandlerDuration(duration, handler)
