@@ -50,20 +50,6 @@ func run(logger *slog.Logger, config *Config) error {
 
 	registry := prometheus.NewRegistry()
 
-	registry.MustRegister(prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: "sm",
-			Subsystem: "crocochrome",
-			Name:      "info",
-			Help:      "Crocochrome Info",
-			ConstLabels: prometheus.Labels{
-				"version":   version.Short(),
-				"commit":    version.Commit(),
-				"timestamp": version.Buildstamp(),
-			},
-		},
-	))
-
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
 		// Id for nobody user and group on alpine.
