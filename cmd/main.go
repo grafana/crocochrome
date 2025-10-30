@@ -40,7 +40,7 @@ func main() {
 }
 
 func run(logger *slog.Logger, config *Config) error {
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "Starting crocochrome supervisor",
+	logger.Info("Starting crocochrome supervisor",
 		slog.String("version", version.Short()),
 		slog.String("commit", version.Commit()),
 		slog.String("timestamp", version.Buildstamp()),
