@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/crocochrome/internal/version"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -44,6 +45,16 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 		[]string{"code"},
 	)
 
+	reg.MustRegister(requests)
+	reg.MustRegister(duration)
+
+	handler = promhttp.InstrumentHandlerCounter(requests, handler)
+	handler = promhttp.InstrumentHandlerDuration(duration, handler)
+
+	return handler
+}
+
+func AddVersionMetrics(reg prometheus.Registerer) {
 	info := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: "sm",
@@ -61,14 +72,10 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 	// make sure the value is always one
 	info.Set(1)
 
-	reg.MustRegister(requests)
-	reg.MustRegister(duration)
 	reg.MustRegister(info)
 
-	handler = promhttp.InstrumentHandlerCounter(requests, handler)
-	handler = promhttp.InstrumentHandlerDuration(duration, handler)
-
-	return handler
+	// Add the standard go_build_info gauge too.
+	reg.MustRegister(collectors.NewBuildInfoCollector())
 }
 
 // SupervisorMetrics contains metrics used by the crocochrome supervisor.
