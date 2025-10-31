@@ -69,6 +69,21 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
+      - name: Sanity check .dockerignore
+        run: |-
+          if [[ -e ".dockerignore" ]]; then
+            cat <<EOF
+          .dockerignore will prevent files tracked by git from being copied into the container, which in turn will
+          cause Go to see the build tree as "dirty", and self-report the version as dirty too. This will cause
+          problems with the deployment process.
+
+          Please remove .dockerignore.
+          If you _really_ need .dockerignore, make sure .gitignore is a superset of .dockerignore, and change this
+          step to test for that.
+          EOF
+
+            exit 1
+          fi
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version-file: go.mod

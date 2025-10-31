@@ -1,8 +1,0 @@
-.github/
-doc/
-manualtest/
-
-.dockerignore
-Dockerfile*
-Makefile
-README.md
