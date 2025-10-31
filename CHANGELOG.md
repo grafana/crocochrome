@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3](https://github.com/grafana/crocochrome/compare/v0.7.2...v0.7.3) (2025-10-31)
+
+
+### Miscellaneous Chores
+
+* internal/version: remove leftover print statement ([42dad05](https://github.com/grafana/crocochrome/commit/42dad05942c2abb30154870c5b709b15c2afeaa7))
+* metrics: add info gauges in a dedicated function ([eb74cbc](https://github.com/grafana/crocochrome/commit/eb74cbc589a3e918d94c6cdaa9d3ce43837a43ab))
+
 ## [0.7.2](https://github.com/grafana/crocochrome/compare/v0.7.1...v0.7.2) (2025-10-31)
 
 
