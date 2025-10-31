@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/grafana/crocochrome/compare/v0.7.1...v0.7.2) (2025-10-31)
+
+
+### Miscellaneous Chores
+
+* fix build tree seen dirty by Go due to .dockerignore ([c34ce22](https://github.com/grafana/crocochrome/commit/c34ce22e048830af499a53dc4cdc742d32f92685))
+* remove useless comment ([d7b6441](https://github.com/grafana/crocochrome/commit/d7b6441ce3b29d78fa3ce292ec4b49a5cf38a536))
+
 ## [0.7.1](https://github.com/grafana/crocochrome/compare/v0.7.0...v0.7.1) (2025-10-31)
 
 
