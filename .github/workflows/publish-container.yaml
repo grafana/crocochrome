@@ -4,6 +4,7 @@ permissions:
   contents: none
 
 on:
+  pull_request: {} # FIXME: Remove this, for troubleshooting only.
   push:
     tags:
       - "v*"
@@ -41,11 +42,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - run: git status
       - name: Build and push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: . # Use checked out repo with full history, instead of letting build making a shallow clone.
           tags: |-
             ghcr.io/${{ github.repository }}:${{ steps.repo.outputs.version }}
-          push: true
+          push: false # FIXME: Change this, for troubleshooting only.
           platforms: linux/amd64,linux/arm64
