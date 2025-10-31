@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/grafana/crocochrome/compare/v0.7.0...v0.7.1) (2025-10-31)
+
+
+### Miscellaneous Chores
+
+* ci: run publish-container workflow with file context ([5e19e48](https://github.com/grafana/crocochrome/commit/5e19e4825a73d932c1ddbafc526f5a7105c24484)), closes [#320](https://github.com/grafana/crocochrome/issues/320)
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v141.0.7390.122-r0-3.22.2 ([42c2faf](https://github.com/grafana/crocochrome/commit/42c2faff86b9954afcc47786f562b07e1db2dacc))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.22.0 ([#318](https://github.com/grafana/crocochrome/issues/318)) ([9a3688d](https://github.com/grafana/crocochrome/commit/9a3688de79831f294eb57aad52adf8ae7d7d9053))
+
 ## [0.7.0](https://github.com/grafana/crocochrome/compare/v0.6.13...v0.7.0) (2025-10-30)
 
 
