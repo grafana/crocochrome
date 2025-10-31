@@ -1,7 +1,6 @@
 package version
 
 import (
-	"fmt"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -49,7 +48,6 @@ var getBuildInfo = sync.OnceValue(func() *debug.BuildInfo {
 	}
 
 	slices.SortFunc(bi.Settings, cmpBuildSettings)
-	fmt.Println(bi)
 
 	return bi
 })
