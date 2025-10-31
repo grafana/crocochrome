@@ -14,7 +14,6 @@ import (
 
 	"github.com/grafana/crocochrome/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -50,6 +49,9 @@ func run(logger *slog.Logger, config *Config) error {
 
 	registry := prometheus.NewRegistry()
 
+	// Add build info metrics, both custom and the standard `go_build_info`.
+	metrics.AddVersionMetrics(registry)
+
 	supervisor := crocochrome.New(logger, crocochrome.Options{
 		ChromiumPath: "chromium",
 		// Id for nobody user and group on alpine.
@@ -70,8 +72,6 @@ func run(logger *slog.Logger, config *Config) error {
 
 	server := crocohttp.New(logger, supervisor)
 	instrumentedServer := metrics.InstrumentHTTP(registry, server)
-	// This adds the bits, but doesn't get the bytes
-	registry.MustRegister(collectors.NewBuildInfoCollector())
 
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
