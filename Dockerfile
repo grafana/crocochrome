@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:141.0.7390.122-r0-3.22.2@sha256:a6d31b00be374d22717d21a04f9b4dce4159c40354376c9ce6dfd69906ec534b AS setcapper
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:142.0.7444.59-r0-3.22.2@sha256:f373e66a07fcf1e13cc46bd4689cd5e68714995f3b7b00cd96b1ed375107e72f AS setcapper
 
 RUN apk --no-cache add libcap
 
@@ -23,7 +23,7 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:141.0.7390.122-r0-3.22.2@sha256:a6d31b00be374d22717d21a04f9b4dce4159c40354376c9ce6dfd69906ec534b
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:142.0.7444.59-r0-3.22.2@sha256:f373e66a07fcf1e13cc46bd4689cd5e68714995f3b7b00cd96b1ed375107e72f
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
