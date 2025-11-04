@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/grafana/crocochrome/compare/v0.7.3...v0.8.0) (2025-11-04)
+
+
+### Features
+
+* Enable SwANGLE for WebGL support ([#331](https://github.com/grafana/crocochrome/issues/331)) ([e11cd81](https://github.com/grafana/crocochrome/commit/e11cd81f2041c82811d3adadc4cc4dbab026a891))
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v142 ([812983d](https://github.com/grafana/crocochrome/commit/812983dd31df1e23d2d7749a272dbc239d2d342a))
+
 ## [0.7.3](https://github.com/grafana/crocochrome/compare/v0.7.2...v0.7.3) (2025-10-31)
 
 
