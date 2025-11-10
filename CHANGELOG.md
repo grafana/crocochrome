@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/grafana/crocochrome/compare/v0.8.0...v0.8.1) (2025-11-10)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-qemu-action digest to c7c5346 ([426102f](https://github.com/grafana/crocochrome/commit/426102faec465fbf2ed035b88a06cadf2a0dedfa))
+* Update module github.com/testcontainers/testcontainers-go to v0.40.0 ([a655a9f](https://github.com/grafana/crocochrome/commit/a655a9fb132427ef737f86b8e2083a047e3ded32))
+
 ## [0.8.0](https://github.com/grafana/crocochrome/compare/v0.7.3...v0.8.0) (2025-11-04)
 
 
