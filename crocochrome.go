@@ -39,6 +39,9 @@ type Supervisor struct {
 	// once, get its user agent, and then make modifications. After doing that process, we store the result here.
 	// ComputeUserAgent() performs this process.
 	userAgent string
+	// wg stores a WaitGroup. This WaitGroup is used to track the number of open sessions, and Supervisor.Wait relies on
+	// it to work.
+	wg *sync.WaitGroup
 }
 
 type Options struct {
@@ -111,6 +114,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 		cclient:  chromium.NewClient(),
 		sessions: map[string]session{},
 		metrics:  metrics.Supervisor(opts.Registry),
+		wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -157,6 +161,8 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
 
+	s.wg.Add(1)
+
 	// Register a function that removes the session from the map when the context is cancelled.
 	// It is okay to register this before adding the session to the map as s.Delete is a no-op if the session does not
 	// exist.
@@ -167,6 +173,7 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		// session has already been removed.
 		logger.Debug("context cancelled, deleting session")
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
+		s.wg.Done()
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
@@ -209,6 +216,11 @@ func (s *Supervisor) Delete(sessionID string) bool {
 	defer s.sessionsMtx.Unlock()
 
 	return s.delete(sessionID)
+}
+
+// Wait blocks until there are no sessions running.
+func (s *Supervisor) Wait() {
+	s.wg.Wait()
 }
 
 // delete cancels a session's context and removes it from the map, without locking the mutex.
