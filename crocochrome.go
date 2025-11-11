@@ -171,7 +171,7 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 		// s.Delete to ensure we remove the session from the map on the natural timeout case, which means that s.Delete
 		// will be called a second time by this function if called manually. This is fine, as s.Delete is a no-op if the
 		// session has already been removed.
-		logger.Debug("context cancelled, deleting session")
+		logger.Debug("context cancelled, removing session from the map")
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
 		s.wg.Done()
 	})
