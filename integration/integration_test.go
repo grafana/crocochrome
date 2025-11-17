@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grafana/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
@@ -189,6 +190,47 @@ func TestIntegration(t *testing.T) {
 
 		// We should have returned in the scanner loop.
 		t.Fatalf("version metric not found")
+	})
+
+	// Test sending SIGTERM won't cancel a session immediately.
+	// ️⚠️ THIS TEST SHOULD BE THE LAST IN THE SUITE
+	// TODO: Split this test so it uses a different container, and it doesn't have to be the last in the suite anymore.
+	t.Run("Handles SIGTERM gracefully", func(t *testing.T) {
+		sess, err := createSession(endpoint)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		// After creating a session, terminate the container.
+		waitStop := make(chan struct{})
+		go func() {
+			defer close(waitStop)
+
+			stopTimeout := 5 * time.Second // Time to wait until sending SIGKILL.
+			err := cc.Stop(ctx, &stopTimeout)
+			if err != nil {
+				t.Errorf("container did not stop cleanly: %v", err)
+			}
+
+			status, err := cc.Inspect(ctx)
+			if err != nil {
+				t.Errorf("inspecting container: %v", err)
+			}
+
+			if ec := status.State.ExitCode; ec != 0 {
+				t.Errorf("container exited with error code %d", ec)
+			}
+		}()
+
+		// Wait to make sure the container got SIGTERM.
+		time.Sleep(2 * time.Second)
+
+		err = deleteSession(endpoint, sess.ID)
+		if err != nil {
+			t.Fatalf("deleting session: %v", err)
+		}
+
+		<-waitStop
 	})
 }
 
