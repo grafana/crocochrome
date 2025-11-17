@@ -108,6 +108,7 @@ func run(logger *slog.Logger, config *Config) error {
 	eg.Go(func() error {
 		const graceTime = 2 * time.Minute
 
+		// Wait for the main context to get canceled. This will typically happen when we receive a signal.
 		<-ctx.Done()
 
 		graceCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), graceTime)
