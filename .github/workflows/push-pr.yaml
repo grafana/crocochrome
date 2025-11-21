@@ -59,6 +59,8 @@ jobs:
           push: false
           tags: ci.local/crocochrome:${{ github.sha }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   golangci:
     name: Lint
