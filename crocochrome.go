@@ -276,6 +276,10 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
 		"--disable-dev-shm-usage",
+		// A large amount of chromium CVEs allegedly come from the JIT. Disabling it has a performance penalty, but
+		// allegedly we do not care about it that much.
+		// https://v8.dev/blog/jitless
+		`--js-flags="--jitless"`,
 
 		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
 		// needed:
