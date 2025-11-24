@@ -54,9 +54,7 @@ func TestIntegration(t *testing.T) {
 			ExposedPorts: []string{"8080/tcp"},
 			WaitingFor:   wait.ForExposedPort(),
 			Networks:     []string{network.Name},
-			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
-			// and be writable.
-			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			Privileged:   true, // Required for bubblewrap to work.
 		},
 	})
 	testcontainers.CleanupContainer(t, cc)
