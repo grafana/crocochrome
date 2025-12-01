@@ -408,6 +408,8 @@ func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
 		}
 	}()
 
+	time.Sleep(5 * time.Second)
+
 	versionCtx, versionCancel := context.WithTimeout(ctx, 3*time.Second)
 	defer versionCancel()
 
