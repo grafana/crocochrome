@@ -426,7 +426,7 @@ func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
 		}
 	}()
 
-	versionCtx, versionCancel := context.WithTimeout(ctx, 2*time.Second)
+	versionCtx, versionCancel := context.WithTimeout(ctx, 3*time.Second)
 	defer versionCancel()
 
 	version, err := s.cclient.Version(versionCtx, net.JoinHostPort("localhost", s.opts.ChromiumPort))
