@@ -59,7 +59,7 @@ func run(logger *slog.Logger, config *Config) error {
 	metrics.AddVersionMetrics(registry)
 
 	supervisor := crocochrome.New(logger, crocochrome.Options{
-		ChromiumPath: "chromium",
+		ChromiumPath: "/usr/bin/chromium-browser",
 		// Id for nobody user and group on alpine.
 		UserGroup: config.UserGroup,
 		// In production we mount an emptyDir here, as opposed to /tmp, and configure chromium to write everything in
