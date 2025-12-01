@@ -261,6 +261,9 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		"--hostname", "crocochrome",
 		"--disable_clone_newnet", // Keep the network namespace untouched (use the pod's).
 		"--disable_rlimits",      // Not fully clear why, but chromium SIGTRAPs if we don't pass this to nsjail.
+		"--no_pivotroot",         // `pivot_root` has no capability and requires running in a privileged container.
+		"--disable_proc",
+		"--bindmount_ro", "/proc",
 		"--bindmount_ro", "/etc",
 		"--bindmount_ro", "/lib", // TODO: Remove after Alpine's /usr merge.
 		"--bindmount_ro", "/bin", // TODO: Remove after Alpine's /usr merge.
