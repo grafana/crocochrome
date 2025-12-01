@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/grafana/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
@@ -54,9 +55,12 @@ func TestIntegration(t *testing.T) {
 			ExposedPorts: []string{"8080/tcp"},
 			WaitingFor:   wait.ForExposedPort(),
 			Networks:     []string{network.Name},
-			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
-			// and be writable.
-			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			// Capabilities required for nsjail to work.
+			// Unconfined apparmor is also required for nsjail.
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.CapAdd = append(hc.CapAdd, "CAP_SYS_ADMIN", "CAP_SYS_CHROOT")
+				hc.SecurityOpt = append(hc.SecurityOpt, "apparmor=unconfined")
+			},
 		},
 	})
 	testcontainers.CleanupContainer(t, cc)
