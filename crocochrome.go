@@ -293,6 +293,7 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
 		"--disable-dev-shm-usage",
+		"--enable-logging=stderr", "--v=1",
 
 		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
 		// needed:
