@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/grafana/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
@@ -55,6 +56,14 @@ func TestIntegration(t *testing.T) {
 			ExposedPorts: []string{"8080/tcp"},
 			WaitingFor:   wait.ForExposedPort(),
 			Networks:     []string{network.Name},
+			Mounts: testcontainers.Mounts(testcontainers.ContainerMount{
+				Source: testcontainers.DockerTmpfsMountSource{
+					TmpfsOptions: &mount.TmpfsOptions{
+						Mode: 0o777,
+					},
+				},
+				Target: "/chromium-tmp",
+			}),
 			HostConfigModifier: func(hc *container.HostConfig) {
 				// GIRLS creates a new namespace for chromium to run into. It doesn't need any particular capability to
 				// do this (see user-namespaces(7)), but the set of capabilities present in that namespace are capped to
