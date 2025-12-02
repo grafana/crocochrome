@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -267,6 +268,8 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		}
 	}()
 
+	const sandboxHome = "/chromium-tmp/home"
+
 	args := []string{
 		// The following flags have been tested to be required:
 		"--headless",
@@ -276,6 +279,8 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
 		"--disable-dev-shm-usage",
+		"--profile-path=" + filepath.Join(sandboxHome, "profile"),
+		"--user-data-dir=" + filepath.Join(sandboxHome, "data"),
 
 		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
 		// needed:
