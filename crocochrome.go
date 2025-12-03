@@ -272,6 +272,7 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		"_internal_sandbox",
 		"bootstrap",
 		"--tmp", tmpDir,
+		"--cwd", "/tmp",
 		"--",
 	}
 
@@ -326,6 +327,18 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	cmd.Env = []string{
+		"HOME=" + sandboxHome,
+		"TMPDIR=/tmp",
+	}
+
+	// Copy the following env vars from the host, if they are defined.
+	for _, key := range []string{"TZ"} {
+		value := os.Getenv(key)
+		if value != "" {
+			cmd.Env = append(cmd.Env, key+"="+value)
+		}
+	}
 
 	created := time.Now()
 	defer func() {
