@@ -256,22 +256,22 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	tmpDir, err := os.MkdirTemp(s.opts.TempDir, "chromium-*")
+	hostTmp, err := os.MkdirTemp(s.opts.TempDir, "chromium-*")
 	if err != nil {
 		return fmt.Errorf("creating temp directory: %w", err)
 	}
 
 	defer func() {
-		err := os.RemoveAll(tmpDir)
+		err := os.RemoveAll(hostTmp)
 		if err != nil {
-			panic("could not remove tmpdir")
+			panic("could not remove out-of-sandbox tmp folder")
 		}
 	}()
 
 	bwrapArgs := []string{
 		"_internal_sandbox",
 		"bootstrap",
-		"--tmp", tmpDir,
+		"--tmp", hostTmp,
 		"--cwd", "/tmp",
 		"--",
 	}
