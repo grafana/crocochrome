@@ -7,11 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -51,6 +51,8 @@ type Options struct {
 	// ChromiumPort is the port where chromium will be instructed to listen.
 	// Defaults to 5222.
 	ChromiumPort string
+	// DisableSandbox runs chromium directly, instead of using the bubblewrap sandbox (`bwrap`).
+	DisableSandbox bool
 	// Maximum time a browser is allowed to be running, after which it will be killed unconditionally.
 	// Defaults to 5m.
 	SessionTimeout time.Duration
@@ -254,20 +256,29 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	tmpDir, err := s.mkdirTemp()
+	hostTmp, err := os.MkdirTemp(s.opts.TempDir, "chromium-*")
 	if err != nil {
-		return fmt.Errorf("creating temporary directory: %w", err)
+		return fmt.Errorf("creating temp directory: %w", err)
 	}
 
 	defer func() {
-		// Clean up files after chromium exits.
-		err := os.RemoveAll(tmpDir)
+		err := os.RemoveAll(hostTmp)
 		if err != nil {
-			panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
+			panic("could not remove out-of-sandbox tmp folder")
 		}
 	}()
 
-	args := []string{
+	bwrapArgs := []string{
+		"_internal_sandbox",
+		"bootstrap",
+		"--tmp", hostTmp,
+		"--cwd", "/tmp",
+		"--",
+	}
+
+	const sandboxHome = "/tmp/home"
+
+	chromiumArgs := []string{
 		// The following flags have been tested to be required:
 		"--headless",
 		"--remote-debugging-address=0.0.0.0",
@@ -276,6 +287,8 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
 		"--disable-dev-shm-usage",
+		"--profile-path=" + filepath.Join(sandboxHome, "profile"),
+		"--user-data-dir=" + filepath.Join(sandboxHome, "data"),
 
 		// The following flags have been added here because they _seemed_ beneficial, but haven't been proved to be
 		// needed:
@@ -291,30 +304,39 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	}
 
 	if s.userAgent != "" {
-		args = append(
-			args,
+		chromiumArgs = append(
+			chromiumArgs,
 			"--user-agent="+s.userAgent,
 		)
 	}
 
-	cmd := exec.CommandContext(ctx,
-		s.opts.ChromiumPath,
-		args...,
-	)
-	cmd.Env = []string{
-		// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
-		// we created for this session, because /tmp is read-only in production.
-		// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
-		"TMPDIR=" + tmpDir,
+	var cmd *exec.Cmd
+	if s.opts.DisableSandbox {
+		logger.Warn("sandbox is disabled, chromium will run with highly elevated permissions")
+
+		cmd = exec.CommandContext(ctx,
+			s.opts.ChromiumPath,
+			chromiumArgs...,
+		)
+	} else {
+		cmd = exec.CommandContext(ctx,
+			"girls",
+			append(append(bwrapArgs, s.opts.ChromiumPath), chromiumArgs...)...,
+		)
 	}
+
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	if s.opts.UserGroup != 0 {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: uint32(s.opts.UserGroup),
-				Gid: uint32(s.opts.UserGroup),
-			},
+	cmd.Env = []string{
+		"HOME=" + sandboxHome,
+		"TMPDIR=/tmp",
+	}
+
+	// Copy the following env vars from the host, if they are defined.
+	for _, key := range []string{"TZ"} {
+		value := os.Getenv(key)
+		if value != "" {
+			cmd.Env = append(cmd.Env, key+"="+value)
 		}
 	}
 
@@ -323,10 +345,9 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
-	err = cmd.Run()
-
 	attrs := make([]slog.Attr, 0, 9)
 
+	err = cmd.Run()
 	if err != nil {
 		attrs = append(attrs, slog.Attr{Key: "err", Value: slog.AnyValue(err)})
 	}
@@ -380,37 +401,6 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	logger.LogAttrs(ctx, slog.LevelInfo, "chromium process finished", attrs...)
 
 	return nil
-}
-
-func (s *Supervisor) mkdirTemp() (string, error) {
-	_, err := os.Stat(s.opts.TempDir)
-	if errors.Is(err, fs.ErrNotExist) {
-		s.logger.Warn(
-			"Specified TempDir does not exist, is it mounted? Falling back to creating it.",
-			"TempDir", s.opts.TempDir,
-		)
-		err = os.MkdirAll(s.opts.TempDir, 0o755) // 700 would not allow other users to descend into subdirectories.
-		if err != nil {
-			return "", fmt.Errorf("tmpdir does not exist and couldn't be created: %w", err)
-		}
-	}
-
-	tmpDir, err := os.MkdirTemp(s.opts.TempDir, "")
-	if err != nil {
-		return "", err
-	}
-
-	if s.opts.UserGroup == 0 {
-		// No chowning necessary.
-		return tmpDir, nil
-	}
-
-	err = os.Chown(tmpDir, s.opts.UserGroup, s.opts.UserGroup)
-	if err != nil {
-		return "", fmt.Errorf("chowning temporary dir: %w", err)
-	}
-
-	return tmpDir, nil
 }
 
 // ComputeUserAgent runs chromium once, retrieves its default user agent, and stores a patched version so it can be used
