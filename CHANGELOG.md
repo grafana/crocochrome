@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.9.0](https://github.com/grafana/crocochrome/compare/v0.8.1...v0.9.0) (2025-12-09)
+
+
+### Features
+
+* implement Supervisor.Wait to allow waiting for ongoing sessions ([733e57c](https://github.com/grafana/crocochrome/commit/733e57c1afc08416999edd1d8106a0e8d1fcf29d))
+* wait for open sessions after receiving signal ([43000c3](https://github.com/grafana/crocochrome/commit/43000c3befbf888eb253076582de2858f0bfd87b))
+
+
+### Miscellaneous Chores
+
+* add integration test for graceful SIGTERM handling ([39c238b](https://github.com/grafana/crocochrome/commit/39c238b2d43eab3883aa15e7f4d20a0876b67a58))
+* ci: cache container build to GHA ([012c2ac](https://github.com/grafana/crocochrome/commit/012c2ac92878ceacb1d253bdbf77f8e6ff6f973a))
+* clarify log ([0246eac](https://github.com/grafana/crocochrome/commit/0246eac9613aef10a497b15b3c59510332e9e9e8))
+* clarify the cleanup goroutine is waiting for context ([ac7327e](https://github.com/grafana/crocochrome/commit/ac7327e98562908f3e76d7f66550042a79ae5c72))
+* Update actions/checkout action to v5.0.1 ([#345](https://github.com/grafana/crocochrome/issues/345)) ([9f87ce2](https://github.com/grafana/crocochrome/commit/9f87ce2252b71a293dac830ebeec1271fbb838f1))
+* Update actions/checkout action to v6 ([#351](https://github.com/grafana/crocochrome/issues/351)) ([f8d036f](https://github.com/grafana/crocochrome/commit/f8d036fbb2fd4ceb9434a08edef92f988f64b62e))
+* Update actions/checkout action to v6.0.1 ([#357](https://github.com/grafana/crocochrome/issues/357)) ([0de5f90](https://github.com/grafana/crocochrome/commit/0de5f9044593184d25189d2e09b4da37f2816a0e))
+* Update actions/checkout digest to 8e8c483 ([#356](https://github.com/grafana/crocochrome/issues/356)) ([c3385f2](https://github.com/grafana/crocochrome/commit/c3385f2fcbdc53d985acabeb8e672464b7bc95ce))
+* Update actions/checkout digest to 93cb6ef ([#343](https://github.com/grafana/crocochrome/issues/343)) ([c19e393](https://github.com/grafana/crocochrome/commit/c19e393c3df3587170703c416ad8b920e0f4e34d))
+* Update actions/create-github-app-token digest to 29824e6 ([#358](https://github.com/grafana/crocochrome/issues/358)) ([cbd42d3](https://github.com/grafana/crocochrome/commit/cbd42d392c953c37a0bb04338d25d5baaf1511db))
+* Update actions/create-github-app-token digest to 7e473ef ([#350](https://github.com/grafana/crocochrome/issues/350)) ([6dc6dff](https://github.com/grafana/crocochrome/commit/6dc6dffda07b9fc1c2a3731086589137c4ed0a8b))
+* Update actions/setup-go digest to 4dc6199 ([#348](https://github.com/grafana/crocochrome/issues/348)) ([c8df201](https://github.com/grafana/crocochrome/commit/c8df2011b6952f17db00db550fc4517eff88728a))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:142.0.7444.59-r0-3.22.2 Docker digest to 2e68718 ([#354](https://github.com/grafana/crocochrome/issues/354)) ([eb60721](https://github.com/grafana/crocochrome/commit/eb60721f2c1d2b6f89fd35143eaca74a584d1157))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:142.0.7444.59-r0-3.22.2 Docker digest to 4bfff84 ([#346](https://github.com/grafana/crocochrome/issues/346)) ([61623f7](https://github.com/grafana/crocochrome/commit/61623f7446129abb077b8adec47b683d4f94ff06))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:142.0.7444.59-r0-3.22.2 Docker digest to 5dcd595 ([#336](https://github.com/grafana/crocochrome/issues/336)) ([ca56a36](https://github.com/grafana/crocochrome/commit/ca56a36c12f382988d873d889ce7e6f04336c819))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.23.0 ([#338](https://github.com/grafana/crocochrome/issues/338)) ([a6d93a8](https://github.com/grafana/crocochrome/commit/a6d93a85f02487d919e6fe3465bdce8d8d249947))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.23.1 ([#349](https://github.com/grafana/crocochrome/issues/349)) ([b39c7c0](https://github.com/grafana/crocochrome/commit/b39c7c0ec7ac16b6495fe1c217fa7f392df4a3ef))
+* Update grafana/k6 Docker tag to v1.4.0 ([#342](https://github.com/grafana/crocochrome/issues/342)) ([56ad26b](https://github.com/grafana/crocochrome/commit/56ad26b1436195d001842f8bcb281558a1ad0a42))
+* Update grafana/k6 Docker tag to v1.4.2 ([9ebeca1](https://github.com/grafana/crocochrome/commit/9ebeca114fb4e18ace6395619ee62ab55e7f3010))
+* Update grafana/sm-renovate digest to 3750fcb ([#337](https://github.com/grafana/crocochrome/issues/337)) ([3a26b0a](https://github.com/grafana/crocochrome/commit/3a26b0ac7e64f3d8eb4d71f8570fa3ab2c6942a5))
+* Update grafana/sm-renovate digest to 5386ced ([#344](https://github.com/grafana/crocochrome/issues/344)) ([b9fbee2](https://github.com/grafana/crocochrome/commit/b9fbee2e2c935564f3900a440125a760c5e0eef5))
+* Update module golang.org/x/crypto to v0.45.0 [SECURITY] ([#347](https://github.com/grafana/crocochrome/issues/347)) ([a0f4442](https://github.com/grafana/crocochrome/commit/a0f4442dcde159fc2edbaff1ac42d875543f39dd))
+
 ## [0.8.1](https://github.com/grafana/crocochrome/compare/v0.8.0...v0.8.1) (2025-11-10)
 
 
