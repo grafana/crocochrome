@@ -22,7 +22,11 @@ func TestCrocochrome(t *testing.T) {
 
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
-		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:      hb.Path,
+			ChromiumPort:      port,
+			DisableBubblewrap: true,
+		})
 
 		session, err := cc.Create()
 		if err != nil {
@@ -62,7 +66,11 @@ func TestCrocochrome(t *testing.T) {
 
 			hb := testutil.NewHeartbeat(t)
 			port := testutil.HTTPInfo(t, testutil.InternalServerErrorHandler)
-			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+			cc := crocochrome.New(logger, crocochrome.Options{
+				ChromiumPath:      hb.Path,
+				ChromiumPort:      port,
+				DisableBubblewrap: true,
+			})
 
 			_, err := cc.Create()
 			if err == nil {
@@ -76,7 +84,11 @@ func TestCrocochrome(t *testing.T) {
 			t.Parallel()
 
 			hb := testutil.NewHeartbeat(t)
-			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: "0"})
+			cc := crocochrome.New(logger, crocochrome.Options{
+				ChromiumPath:      hb.Path,
+				ChromiumPort:      "0",
+				DisableBubblewrap: true,
+			})
 
 			_, err := cc.Create()
 			if err == nil {
@@ -92,7 +104,11 @@ func TestCrocochrome(t *testing.T) {
 
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
-		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:      hb.Path,
+			ChromiumPort:      port,
+			DisableBubblewrap: true,
+		})
 
 		sess, err := cc.Create()
 		if err != nil {
@@ -115,7 +131,11 @@ func TestCrocochrome(t *testing.T) {
 
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
-		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:      hb.Path,
+			ChromiumPort:      port,
+			DisableBubblewrap: true,
+		})
 
 		sess1, err := cc.Create()
 		if err != nil {
@@ -143,7 +163,12 @@ func TestCrocochrome(t *testing.T) {
 
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
-		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:      hb.Path,
+			ChromiumPort:      port,
+			DisableBubblewrap: true,
+			SessionTimeout:    3 * time.Second,
+		})
 
 		_, err := cc.Create()
 		if err != nil {

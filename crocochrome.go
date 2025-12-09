@@ -7,11 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -51,6 +51,8 @@ type Options struct {
 	// ChromiumPort is the port where chromium will be instructed to listen.
 	// Defaults to 5222.
 	ChromiumPort string
+	// DisableBubblewrap runs chromium directly, instead of using the bubblewrap sandbox (`bwrap`).
+	DisableBubblewrap bool
 	// Maximum time a browser is allowed to be running, after which it will be killed unconditionally.
 	// Defaults to 5m.
 	SessionTimeout time.Duration
@@ -254,20 +256,29 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	tmpDir, err := s.mkdirTemp()
-	if err != nil {
-		return fmt.Errorf("creating temporary directory: %w", err)
+	bwrapArgs := []string{
+		"--die-with-parent", // Ensures child process (COMMAND) dies when bwrap's parent dies.
+		"--unshare-all",
+		"--share-net",
+		"--proc", "/proc",
+		"--dev", "/dev",
+		"--ro-bind", "/etc", "/etc",
+		"--ro-bind", "/usr", "/usr",
+		"--ro-bind", "/lib", "/lib", // TODO: Remove after Alpine's /usr merge.
+		"--ro-bind", "/bin", "/bin", // TODO: Remove after Alpine's /usr merge.
+		"--dir", "/tmp",
+		"--clearenv",
+		"--setenv", "TMPDIR", "/tmp",
 	}
 
-	defer func() {
-		// Clean up files after chromium exits.
-		err := os.RemoveAll(tmpDir)
-		if err != nil {
-			panic(fmt.Errorf("deleting tmpdir, bug or sandbox compromised: %w", err))
-		}
-	}()
+	if s.opts.UserGroup != 0 {
+		bwrapArgs = append(bwrapArgs,
+			"--uid", strconv.Itoa(s.opts.UserGroup),
+			"--gid", strconv.Itoa(s.opts.UserGroup),
+		)
+	}
 
-	args := []string{
+	chromiumArgs := []string{
 		// The following flags have been tested to be required:
 		"--headless",
 		"--remote-debugging-address=0.0.0.0",
@@ -291,42 +302,38 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	}
 
 	if s.userAgent != "" {
-		args = append(
-			args,
+		chromiumArgs = append(
+			chromiumArgs,
 			"--user-agent="+s.userAgent,
 		)
 	}
 
-	cmd := exec.CommandContext(ctx,
-		s.opts.ChromiumPath,
-		args...,
-	)
-	cmd.Env = []string{
-		// Chromium uses this env var to figure where the temporary directory is. We want that to be the directory
-		// we created for this session, because /tmp is read-only in production.
-		// https://github.com/chromium/chromium/blob/7c4f56ca9dba3a884212ef3a71c8db5d3633f0a6/base/files/file_util_posix.cc#L764
-		"TMPDIR=" + tmpDir,
+	var cmd *exec.Cmd
+	if s.opts.DisableBubblewrap {
+		logger.Warn("bubblewrap is disabled, chromium will run with highly elevated permissions")
+
+		cmd = exec.CommandContext(ctx,
+			s.opts.ChromiumPath,
+			chromiumArgs...,
+		)
+	} else {
+		cmd = exec.CommandContext(ctx,
+			"bwrap",
+			append(append(bwrapArgs, s.opts.ChromiumPath), chromiumArgs...)...,
+		)
 	}
+
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	if s.opts.UserGroup != 0 {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: uint32(s.opts.UserGroup),
-				Gid: uint32(s.opts.UserGroup),
-			},
-		}
-	}
 
 	created := time.Now()
 	defer func() {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
-	err = cmd.Run()
-
 	attrs := make([]slog.Attr, 0, 9)
 
+	err := cmd.Run()
 	if err != nil {
 		attrs = append(attrs, slog.Attr{Key: "err", Value: slog.AnyValue(err)})
 	}
@@ -380,37 +387,6 @@ func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
 	logger.LogAttrs(ctx, slog.LevelInfo, "chromium process finished", attrs...)
 
 	return nil
-}
-
-func (s *Supervisor) mkdirTemp() (string, error) {
-	_, err := os.Stat(s.opts.TempDir)
-	if errors.Is(err, fs.ErrNotExist) {
-		s.logger.Warn(
-			"Specified TempDir does not exist, is it mounted? Falling back to creating it.",
-			"TempDir", s.opts.TempDir,
-		)
-		err = os.MkdirAll(s.opts.TempDir, 0o755) // 700 would not allow other users to descend into subdirectories.
-		if err != nil {
-			return "", fmt.Errorf("tmpdir does not exist and couldn't be created: %w", err)
-		}
-	}
-
-	tmpDir, err := os.MkdirTemp(s.opts.TempDir, "")
-	if err != nil {
-		return "", err
-	}
-
-	if s.opts.UserGroup == 0 {
-		// No chowning necessary.
-		return tmpDir, nil
-	}
-
-	err = os.Chown(tmpDir, s.opts.UserGroup, s.opts.UserGroup)
-	if err != nil {
-		return "", fmt.Errorf("chowning temporary dir: %w", err)
-	}
-
-	return tmpDir, nil
 }
 
 // ComputeUserAgent runs chromium once, retrieves its default user agent, and stores a patched version so it can be used
