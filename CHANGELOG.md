@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/grafana/crocochrome/compare/v0.9.0...v0.9.1) (2025-12-11)
+
+
+### Miscellaneous Chores
+
+* Update module golang.org/x/sync to v0.19.0 ([#359](https://github.com/grafana/crocochrome/issues/359)) ([d8eda3b](https://github.com/grafana/crocochrome/commit/d8eda3b79442c8a9503bb0b7ceb8c64ac0137868))
+
 ## [0.9.0](https://github.com/grafana/crocochrome/compare/v0.8.1...v0.9.0) (2025-12-09)
 
 
