@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/grafana/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
@@ -54,9 +56,23 @@ func TestIntegration(t *testing.T) {
 			ExposedPorts: []string{"8080/tcp"},
 			WaitingFor:   wait.ForExposedPort(),
 			Networks:     []string{network.Name},
-			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
-			// and be writable.
-			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			Mounts: testcontainers.Mounts(testcontainers.ContainerMount{
+				Source: testcontainers.DockerTmpfsMountSource{
+					TmpfsOptions: &mount.TmpfsOptions{
+						Mode: 0o777,
+					},
+				},
+				Target: "/chromium-tmp",
+			}),
+			HostConfigModifier: func(hc *container.HostConfig) {
+				// GIRLS creates a new namespace for chromium to run into. It doesn't need any particular capability to
+				// do this (see user-namespaces(7)), but the set of capabilities present in that namespace are capped to
+				// those of the container. We want that restricted namespace to have these harmless capabilities in
+				// there, so we need to add them to the container.
+				hc.CapAdd = append(hc.CapAdd, "CAP_SYS_ADMIN", "CAP_SYS_CHROOT")
+				// Unconfined apparmor is required to create user namespaces.
+				hc.SecurityOpt = append(hc.SecurityOpt, "apparmor=unconfined")
+			},
 		},
 	})
 	testcontainers.CleanupContainer(t, cc)
