@@ -74,7 +74,7 @@ func TestIntegration(t *testing.T) {
 		Started: true,
 		ContainerRequest: testcontainers.ContainerRequest{
 			// Renovate updates the version below. Keep its format as it is or update the renovate config with it.
-			Image:      "grafana/k6:1.4.2",
+			Image:      "grafana/k6:1.5.0",
 			Entrypoint: []string{"/bin/sleep", "infinity"},
 			Networks:   []string{network.Name},
 		},
