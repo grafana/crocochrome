@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.4](https://github.com/grafana/crocochrome/compare/v0.9.3...v0.9.4) (2026-02-04)
+
+
+### Miscellaneous Chores
+
+* Update actions/checkout action to v6.0.2 ([27989e6](https://github.com/grafana/crocochrome/commit/27989e69a82cecebc9875a81712cf56662e26a9f))
+* Update actions/checkout digest to de0fac2 ([44c8e30](https://github.com/grafana/crocochrome/commit/44c8e30963b775314ce152abfb08cd5abc7c064a))
+* Update docker/login-action digest to c94ce9f ([d98a957](https://github.com/grafana/crocochrome/commit/d98a957ea295741a53583da410968d44077890ee))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:143.0.7499.169-r0-3.23.2 Docker digest to 304cadc ([4b33d0e](https://github.com/grafana/crocochrome/commit/4b33d0e547c6b310da353d3d54ce5eda24331cba))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:143.0.7499.169-r0-3.23.2 Docker digest to 4c106aa ([18f2448](https://github.com/grafana/crocochrome/commit/18f24482575a3d27396a6a79d8e599f4bbcb413e))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.28.2 ([#375](https://github.com/grafana/crocochrome/issues/375)) ([8095d1a](https://github.com/grafana/crocochrome/commit/8095d1a9bb089ff138ef85eff7ccc10af4873bf7))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.28.4 ([5022e87](https://github.com/grafana/crocochrome/commit/5022e8710b845540b32a8c79bc7354832b89d9fa))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.29.0 ([c734924](https://github.com/grafana/crocochrome/commit/c734924aaaa8ad7ab492d7d6457d9ebacb670d7e))
+* Update grafana/sm-renovate digest to 3d955ac ([356751f](https://github.com/grafana/crocochrome/commit/356751fd71da51ae957f77f1e5e2b418621247bf))
+* Update grafana/sm-renovate digest to 8dbe4a6 ([8ef934e](https://github.com/grafana/crocochrome/commit/8ef934e982eb4d4f4e83e6b5ab6262d45c111933))
+* Update grafana/sm-renovate digest to c76605f ([2911df5](https://github.com/grafana/crocochrome/commit/2911df568c1d9f612685660e7cc13428c582aea3))
+
 ## [0.9.3](https://github.com/grafana/crocochrome/compare/v0.9.2...v0.9.3) (2026-01-19)
 
 
