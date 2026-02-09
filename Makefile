@@ -1,5 +1,5 @@
 docker ?= docker
-buildtools_image ?= ghcr.io/grafana/grafana-build-tools:1.29.0
+buildtools_image ?= ghcr.io/grafana/grafana-build-tools:v1.30.0
 
 # --net=host and mounting docker.sock are required to run integration tests, which use testcontainers.
 buildtools = $(docker) run --rm -i \
