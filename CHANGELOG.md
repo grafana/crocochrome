@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.5](https://github.com/grafana/crocochrome/compare/v0.9.4...v0.9.5) (2026-02-16)
+
+
+### Miscellaneous Chores
+
+* Update docker/build-push-action digest to 601a80b ([cc54264](https://github.com/grafana/crocochrome/commit/cc54264444aaa4a6e95f96fa7eceb6537e313079))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.30.0 ([2941e96](https://github.com/grafana/crocochrome/commit/2941e96b1df12b027ff1eed23554d701f18f4a28))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.31.1 ([56ef474](https://github.com/grafana/crocochrome/commit/56ef4743cea0c3b66beade595eef5906bee255b7))
+* Update grafana/k6 Docker tag to v1.6.0 ([c2c2027](https://github.com/grafana/crocochrome/commit/c2c20273644ce004e1e0ea7c97510c4d7b381e46))
+* Update grafana/k6 Docker tag to v1.6.1 ([40caba0](https://github.com/grafana/crocochrome/commit/40caba0aa4f83ee7d41c752594a107850bc52cc9))
+* Update grafana/sm-renovate digest to f029a98 ([e6f5b81](https://github.com/grafana/crocochrome/commit/e6f5b816532ace595ba6a9150366b9080e3a3e0c))
+
 ## [0.9.4](https://github.com/grafana/crocochrome/compare/v0.9.3...v0.9.4) (2026-02-04)
 
 
