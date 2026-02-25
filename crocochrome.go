@@ -99,8 +99,10 @@ func (o Options) withDefaults() Options {
 	return o
 }
 
-// CreateRequest is the optional request body for Create.
-type CreateRequest struct {
+// CheckInfo holds information about the SM check that triggered this session.
+// This mirrors the CheckInfo type in sm-k6-runner.
+type CheckInfo struct {
+	Type     string         `json:"type"`
 	Metadata map[string]any `json:"metadata"`
 }
 
@@ -163,7 +165,7 @@ func (s *Supervisor) Sessions() []string {
 // Currently, creating a new session will terminate other existing ones, if present. Clients should not rely on this
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
-func (s *Supervisor) Create(req CreateRequest) (SessionInfo, error) {
+func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -172,7 +174,7 @@ func (s *Supervisor) Create(req CreateRequest) (SessionInfo, error) {
 	id := randString()
 	logger := s.logger.With("sessionID", id)
 
-	for k, v := range req.Metadata {
+	for k, v := range checkInfo.Metadata {
 		if slices.Contains(allowedLabels, k) {
 			logger = logger.With(k, v)
 		}
