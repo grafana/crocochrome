@@ -47,7 +47,16 @@ func (s *Server) List(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
-	session, err := s.supervisor.Create()
+	var req crocochrome.CheckInfo
+	if r.Header.Get("Content-Type") != "application/json" {
+		s.logger.Info("no JSON content-type, proceeding with empty CheckInfo", "content_type", r.Header.Get("Content-Type"))
+		// No JSON content-type — proceed with zero-value CheckInfo for backwards compatibility.
+	} else if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.logger.Warn("could not decode request body, ignoring", "err", err)
+		req = crocochrome.CheckInfo{}
+	}
+
+	session, err := s.supervisor.Create(req)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		_, _ = rw.Write([]byte(err.Error()))
