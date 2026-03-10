@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -71,6 +72,13 @@ const (
 	defaultSessionTimeout = 5 * time.Minute
 )
 
+// allowedLabels are the metadata keys we enrich session logs with. tenantID and (check) id are regionally unique;
+// the combination of the three labels allows us to connect logs to the specific organization responsible for the check.
+// Note: the casing of regionID and tenantID does not match the protobuf definition (regionId, tenantId) because
+// CheckInfoFromSM in the synthetic-monitoring-agent encodes them this way:
+// https://github.com/grafana/synthetic-monitoring-agent/blob/main/internal/k6runner/k6runner.go#L76-L77
+var allowedLabels = []string{"regionID", "tenantID", "id"}
+
 func (o Options) withDefaults() Options {
 	if o.ChromiumPort == "" {
 		o.ChromiumPort = defaultChromiumPort
@@ -89,6 +97,13 @@ func (o Options) withDefaults() Options {
 	}
 
 	return o
+}
+
+// CheckInfo holds information about the SM check that triggered this session.
+// This mirrors the CheckInfo type in sm-k6-runner.
+type CheckInfo struct {
+	Type     string         `json:"type"`
+	Metadata map[string]any `json:"metadata"`
 }
 
 // SessionInfo contains the ID and chromium info for a session.
@@ -150,7 +165,7 @@ func (s *Supervisor) Sessions() []string {
 // Currently, creating a new session will terminate other existing ones, if present. Clients should not rely on this
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
-func (s *Supervisor) Create() (SessionInfo, error) {
+func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -158,6 +173,12 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 
 	id := randString()
 	logger := s.logger.With("sessionID", id)
+
+	for k, v := range checkInfo.Metadata {
+		if slices.Contains(allowedLabels, k) {
+			logger = logger.With(k, v)
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
 
@@ -179,7 +200,7 @@ func (s *Supervisor) Create() (SessionInfo, error) {
 	// Launch chromium and wait for it to finish asynchronously.
 	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
 	go func() {
-		err := s.launch(ctx, id)
+		err := s.launch(ctx, logger)
 		if err != nil {
 			logger.Error("launching chromium", "err", err)
 		}
@@ -247,9 +268,7 @@ func (s *Supervisor) killExisting() {
 
 // launch prepares the requires directories and launches chromium, blocking until it exits. Cancelling the context kills
 // chromium. The sessionID is used only for logging.
-func (s *Supervisor) launch(ctx context.Context, sessionID string) error {
-	logger := s.logger.With("sessionID", sessionID)
-
+func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
 	logger.Debug("starting session")
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -420,7 +439,7 @@ func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
 	defer cancel()
 
 	go func() {
-		err := s.launch(ctx, "compute-user-agent")
+		err := s.launch(ctx, s.logger.With("sessionID", "compute-user-agent"))
 		if err != nil {
 			s.logger.Error("launching chromium", "err", err)
 		}
