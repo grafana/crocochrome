@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.10.0](https://github.com/grafana/crocochrome/compare/v0.9.6...v0.10.0) (2026-03-10)
+
+
+### Features
+
+* Update /session endpoint to accept metadata ([#401](https://github.com/grafana/crocochrome/issues/401)) ([f1b0ab3](https://github.com/grafana/crocochrome/commit/f1b0ab30525fa21f82ef13473dc59741bae3af57))
+
+
+### Miscellaneous Chores
+
+* Update actions/setup-go digest to 4b73464 ([7cc4c43](https://github.com/grafana/crocochrome/commit/7cc4c43eaa092a0e20e1b75f7579318a6fd6384d))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v144.0.7559.132-r3-3.23.3 ([4618168](https://github.com/grafana/crocochrome/commit/461816810dc1f86970784535809c2b621c3b5bea))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.33.0 ([2d0720c](https://github.com/grafana/crocochrome/commit/2d0720c43efd1fde17e02586dbadcab7f9377e69))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.33.1 ([c0dde47](https://github.com/grafana/crocochrome/commit/c0dde47b28479543383631dc0b74834679cdea0d))
+* Update grafana/sm-renovate digest to 0a18a54 ([18b1031](https://github.com/grafana/crocochrome/commit/18b1031bde17efeaa663fad9420cb95c135a2277))
+* Update module go.opentelemetry.io/otel/sdk to v1.40.0 [SECURITY] ([#400](https://github.com/grafana/crocochrome/issues/400)) ([fd1292c](https://github.com/grafana/crocochrome/commit/fd1292c69f2aca80ebdf4d916395db518fa00711))
+
 ## [0.9.6](https://github.com/grafana/crocochrome/compare/v0.9.5...v0.9.6) (2026-02-23)
 
 
