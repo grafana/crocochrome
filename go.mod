@@ -1,14 +1,12 @@
 module github.com/grafana/crocochrome
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.25.0
 
 require (
 	github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
 	github.com/prometheus/client_golang v1.23.2
 	github.com/testcontainers/testcontainers-go v0.40.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
