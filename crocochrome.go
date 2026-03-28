@@ -291,7 +291,6 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
 		"--headless",
 		"--remote-debugging-address=0.0.0.0",
 		"--remote-debugging-port=" + s.opts.ChromiumPort,
-		"--no-sandbox", // We run a single instance as nobody:nobody, making this redundant.
 		// Containers often have a small /dev/shm, causing crashes if chromium uses it.
 		// http://crbug.com/715363
 		"--disable-dev-shm-usage",
