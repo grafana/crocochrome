@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/crocochrome"
-	"github.com/grafana/crocochrome/testutil"
+	"github.com/grafana/crocochrome/internal/crocochrome"
+	"github.com/grafana/crocochrome/internal/testutil"
 )
 
 func TestCrocochrome(t *testing.T) {

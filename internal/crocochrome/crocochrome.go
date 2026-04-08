@@ -18,8 +18,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/grafana/crocochrome/chromium"
-	"github.com/grafana/crocochrome/metrics"
+	"github.com/grafana/crocochrome/internal/chromium"
+	"github.com/grafana/crocochrome/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

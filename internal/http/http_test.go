@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/crocochrome"
-	crocohttp "github.com/grafana/crocochrome/http"
-	"github.com/grafana/crocochrome/testutil"
+	"github.com/grafana/crocochrome/internal/crocochrome"
+	crocohttp "github.com/grafana/crocochrome/internal/http"
+	"github.com/grafana/crocochrome/internal/testutil"
 )
 
 func TestHTTP(t *testing.T) {

@@ -14,11 +14,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/grafana/crocochrome"
-	crocohttp "github.com/grafana/crocochrome/http"
+	"github.com/grafana/crocochrome/internal/crocochrome"
+	crocohttp "github.com/grafana/crocochrome/internal/http"
+	"github.com/grafana/crocochrome/internal/metrics"
 	"github.com/grafana/crocochrome/internal/version"
 
-	"github.com/grafana/crocochrome/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

@@ -9,7 +9,7 @@ ARG TARGETARCH
 # Build with CGO_ENABLED=0 as grafana-build-tools is debian-based.
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/root/go/pkg \
-  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /usr/local/bin/crocochrome ./cmd
+  make GOOS=$TARGETOS GOARCH=$TARGETARCH DISTDIR=/usr/local/bin LOCAL=true build
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
 FROM ghcr.io/grafana/chromium-swiftshader-alpine:146.0.7680.177-r0-3.23.3@sha256:13fd66c88ce5345a7e6c4bfad0273d402e658bc1ab73fae2fb1d67ceb8a5d4cf AS setcapper
