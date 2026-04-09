@@ -17,6 +17,10 @@ import (
 func TestCrocochrome(t *testing.T) {
 	t.Parallel()
 
+	if testing.Short() {
+		t.Skip("skipping long tests")
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
 
 	t.Run("creates a session", func(t *testing.T) {

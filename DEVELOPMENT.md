@@ -9,8 +9,9 @@ Build, lint, and test run inside the `grafana-build-tools` Docker image via
 Make:
 
 ```bash
-make build              # Build binary to dist/crocochrome
+make build              # Build binary to dist/crocochrome (via Docker)
 make test               # Run all tests (via Docker)
+make test-short         # Run short tests only (via Docker)
 make lint               # Run golangci-lint (via Docker)
 make build-container    # Build the Docker image
 make test-integration   # Run integration tests
@@ -24,11 +25,12 @@ If you need to inspect the commands used by the make targets, you can use `make
 they are the stable interfaces to these processes (and in most cases, they are
 shorter, too).
 
-By default `test`, and `lint` run inside the `grafana-build-tools` container.
-Set `LOCAL=true` to run them natively instead (this is set automatically when
-`CI=true`):
+By default `build`, `test`, and `lint` run inside the `grafana-build-tools`
+container. Set `LOCAL=true` to run them natively instead (this is set
+automatically when `CI=true`):
 
 ```bash
+make LOCAL=true build
 make LOCAL=true test
 make LOCAL=true lint
 ```

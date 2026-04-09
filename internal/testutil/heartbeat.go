@@ -48,7 +48,8 @@ func NewHeartbeat(t *testing.T) Heartbeat {
 	if err != nil {
 		t.Fatalf("creating heartbeat script: %v", err)
 	}
-	defer scriptFile.Close()
+
+	defer scriptFile.Close() //nolint:errcheck // We can ignore this error in tests.
 
 	_, err = scriptFile.WriteString(heartbeatSh)
 	if err != nil {

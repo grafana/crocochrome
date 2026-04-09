@@ -33,7 +33,7 @@ func TestHTTP(t *testing.T) {
 			t.Fatalf("making request: %v", err)
 		}
 
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
 
 		var response struct {
 			ID              string `json:"ID"`
