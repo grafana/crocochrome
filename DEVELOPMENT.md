@@ -33,7 +33,7 @@ make LOCAL=true test
 make LOCAL=true lint
 ```
 
-Be warned that `LOCAL=true` might cause build issues because mismatches between
+Be warned that `LOCAL=true` might cause build issues because of mismatches between
 the local Go version and the one shipped with `grafana-build-tools`. Unless you
 have a good reason for using the local tools, prefer the versions in the
 container image. The overhead of running things in a container is about 100-200
