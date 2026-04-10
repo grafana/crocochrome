@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration_test
 
 import (
@@ -14,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/crocochrome"
+	"github.com/grafana/crocochrome/internal/crocochrome"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/network"

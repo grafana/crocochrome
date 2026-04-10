@@ -43,6 +43,22 @@ jobs:
       - run: |
           make test
 
+  test-integration:
+    name: Integration tests
+    strategy:
+      matrix:
+        platform: [ ubuntu-latest, ubuntu-24.04-arm ]
+      fail-fast: false
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - run: |
+          make test-integration
+
   build-container:
     name: Build container image
     runs-on: ubuntu-latest
@@ -71,6 +87,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+
       - name: Sanity check .dockerignore
         run: |-
           if [[ -e ".dockerignore" ]]; then
@@ -86,16 +103,10 @@ jobs:
 
             exit 1
           fi
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
-        with:
-          go-version-file: go.mod
-          cache: false # Recommended by golangci-lint, undocumented why.
-      # Get golangci-lint version present in grafana-build-tools.
-      - id: version
+
+      - id: lint
         run: |-
-          echo "golangci=$(make lint-version)" >> $GITHUB_OUTPUT
-      # Use the golangci-lint action, which provides Github-specific features such as diff annotations.
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6
-        with:
-          version: ${{ steps.version.golangci }}
+          # Force the makefile to use the docker container to run the linter.
+          # This ensures the environment where the linter is running is sane
+          # (go toolchain version matches the one used to build the linter).
+          make CI=false LOCAL=false S= lint

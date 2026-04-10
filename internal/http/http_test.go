@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/crocochrome"
-	crocohttp "github.com/grafana/crocochrome/http"
-	"github.com/grafana/crocochrome/testutil"
+	"github.com/grafana/crocochrome/internal/crocochrome"
+	crocohttp "github.com/grafana/crocochrome/internal/http"
+	"github.com/grafana/crocochrome/internal/testutil"
 )
 
 func TestHTTP(t *testing.T) {
@@ -33,7 +33,7 @@ func TestHTTP(t *testing.T) {
 			t.Fatalf("making request: %v", err)
 		}
 
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
 
 		var response struct {
 			ID              string `json:"ID"`

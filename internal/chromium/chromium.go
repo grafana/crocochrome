@@ -70,7 +70,11 @@ func (c *Client) version(ctx context.Context, address string) (*VersionInfo, err
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		// Ignore errors when closing the body. Assume any read error
+		// is going to be reflected during the read operation below.
+		_ = resp.Body.Close()
+	}()
 
 	versionInfo := VersionInfo{}
 	err = json.NewDecoder(resp.Body).Decode(&versionInfo)

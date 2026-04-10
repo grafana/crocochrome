@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/grafana/crocochrome"
+	"github.com/grafana/crocochrome/internal/crocochrome"
 	"github.com/koding/websocketproxy"
 )
 
