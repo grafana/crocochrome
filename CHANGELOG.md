@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.10.1](https://github.com/grafana/crocochrome/compare/v0.10.0...v0.10.1) (2026-04-13)
+
+
+### Fixes
+
+* Move packages to internal/ and overhaul build system ([#423](https://github.com/grafana/crocochrome/issues/423)) ([d544525](https://github.com/grafana/crocochrome/commit/d544525d74f374f8c789fd011456e41396b8fd80))
+
+
+### Miscellaneous Chores
+
+* Update actions/create-github-app-token action to v3 ([#421](https://github.com/grafana/crocochrome/issues/421)) ([362fce1](https://github.com/grafana/crocochrome/commit/362fce162648220c9d9411a0f47fc505c8184079))
+* Update actions/create-github-app-token digest to fee1f7d ([#416](https://github.com/grafana/crocochrome/issues/416)) ([127d88a](https://github.com/grafana/crocochrome/commit/127d88a876b9dde9092e49323e86ec569e79842b))
+* Update actions/setup-go digest to 4a36011 ([64bc657](https://github.com/grafana/crocochrome/commit/64bc6576798c21f5521f7248c9be032c546f5c39))
+* Update docker/build-push-action action to v7 ([#414](https://github.com/grafana/crocochrome/issues/414)) ([019f92b](https://github.com/grafana/crocochrome/commit/019f92b575bbb73c13c549a570fef2c56c3ade26))
+* Update docker/build-push-action digest to bcafcac ([#428](https://github.com/grafana/crocochrome/issues/428)) ([3eb69dc](https://github.com/grafana/crocochrome/commit/3eb69dcd1bbd63412a341aaf174e9eaaee9f4c8e))
+* Update docker/login-action action to v4 ([e0e6e87](https://github.com/grafana/crocochrome/commit/e0e6e87fcf41b2ff4ca53f223025e5536af6d891))
+* Update docker/setup-buildx-action action to v4 ([#412](https://github.com/grafana/crocochrome/issues/412)) ([73fcfd5](https://github.com/grafana/crocochrome/commit/73fcfd5cfb85fdb776ab4a7f7aa295ee75e05e40))
+* Update docker/setup-qemu-action action to v4 ([454bb1d](https://github.com/grafana/crocochrome/commit/454bb1da212c59fb3ca36e9fc38f1b855cc263ab))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v146 ([#422](https://github.com/grafana/crocochrome/issues/422)) ([1bc8933](https://github.com/grafana/crocochrome/commit/1bc8933426d9dbb033fc354025cabe284e5cb3ca))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:144.0.7559.132-r3-3.23.3 Docker digest to d7a190a ([7b3ebe7](https://github.com/grafana/crocochrome/commit/7b3ebe71d037a6b01b921c52c00c9c93edbebc29))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.34.0 ([7f23a01](https://github.com/grafana/crocochrome/commit/7f23a015b54256c74a62d290d0451eed4a7faa6f))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.35.0 ([#424](https://github.com/grafana/crocochrome/issues/424)) ([2ee6350](https://github.com/grafana/crocochrome/commit/2ee63507402be750626f84c839ab9c80d2e60bdc))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.35.1 ([#427](https://github.com/grafana/crocochrome/issues/427)) ([bc60cc3](https://github.com/grafana/crocochrome/commit/bc60cc36d82b33452b13ece99c0c42014e838276))
+* Update grafana/k6 Docker tag to v1.7.1 ([159fd27](https://github.com/grafana/crocochrome/commit/159fd278aff5ad1602d5ee18fc4b27b1aa40bedd))
+* Update grafana/sm-renovate digest to 7da70f0 ([1a28e43](https://github.com/grafana/crocochrome/commit/1a28e430081534b49ba087be9b059822b4c20ab8))
+* Update module github.com/testcontainers/testcontainers-go to v0.41.0 ([#415](https://github.com/grafana/crocochrome/issues/415)) ([2a27792](https://github.com/grafana/crocochrome/commit/2a277920933710f2e47fb72d641d1eef4fcf6ad2))
+* Update module golang.org/x/net to v0.51.0 [SECURITY] ([#431](https://github.com/grafana/crocochrome/issues/431)) ([14ed9a3](https://github.com/grafana/crocochrome/commit/14ed9a314a622e3ed1cf58b29194483200b4b6d6))
+* Update module google.golang.org/grpc to v1.79.3 [SECURITY] ([#430](https://github.com/grafana/crocochrome/issues/430)) ([a62bb16](https://github.com/grafana/crocochrome/commit/a62bb16372ac6cb5bb2607b4605756c7d50fe4cf))
+
 ## [0.10.0](https://github.com/grafana/crocochrome/compare/v0.9.6...v0.10.0) (2026-03-10)
 
 
