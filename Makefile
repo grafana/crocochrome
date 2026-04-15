@@ -23,7 +23,7 @@ ifneq ($(strip $(S)),)
 endif
 
 docker ?= docker
-buildtools_image ?= ghcr.io/grafana/grafana-build-tools:v1.35.1
+buildtools_image ?= ghcr.io/grafana/grafana-build-tools:v1.36.0
 image ?= test.local/crocochrome
 
 ifeq ($(strip $(LOCAL)),true)
