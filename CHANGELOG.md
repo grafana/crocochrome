@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.2](https://github.com/grafana/crocochrome/compare/v0.10.1...v0.10.2) (2026-04-16)
+
+
+### Miscellaneous Chores
+
+* Update actions/create-github-app-token digest to 1b10c78 ([0dbe50b](https://github.com/grafana/crocochrome/commit/0dbe50b801c97f62ae9c9375c8b3e696a9d05350))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:146.0.7680.177-r0-3.23.3 Docker digest to e8d7cd1 ([#429](https://github.com/grafana/crocochrome/issues/429)) ([ee73128](https://github.com/grafana/crocochrome/commit/ee73128672f6a95737a10a911e900adca755d2e4))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.36.0 ([#435](https://github.com/grafana/crocochrome/issues/435)) ([987a68c](https://github.com/grafana/crocochrome/commit/987a68c5a5a82e466b847e1fb86cd7e84d00ca45))
+* Update googleapis/release-please-action digest to 5c625bf ([ebdcfdc](https://github.com/grafana/crocochrome/commit/ebdcfdc6b899d693dd6e947f3908c6f39d8242de))
+* Update module github.com/testcontainers/testcontainers-go to v0.42.0 ([94aa313](https://github.com/grafana/crocochrome/commit/94aa313ac56d284ebde3e56aec80426a1a2e7f53))
+* Update module golang.org/x/sync to v0.20.0 ([#413](https://github.com/grafana/crocochrome/issues/413)) ([16c6ee6](https://github.com/grafana/crocochrome/commit/16c6ee665164f114393f9959f55aeec1e1a36009))
+
 ## [0.10.1](https://github.com/grafana/crocochrome/compare/v0.10.0...v0.10.1) (2026-04-13)
 
 
