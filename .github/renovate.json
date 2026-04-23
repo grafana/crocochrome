@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>grafana/grafana-renovate-config//presets/shared-workflows",
+    "github>grafana/sm-renovate//presets/grafana.json5",
+    "github>grafana/sm-renovate//presets/synthetic-monitoring.json5",
+    "github>grafana/sm-renovate//presets/go.json5",
+    "github>grafana/sm-renovate//presets/grafana-build-tools.json5"
+  ],
+  "ignorePresets": [
+    "github>grafana/grafana-renovate-config//presets/automerge"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "depNameTemplate": "grafana/k6",
+      "datasourceTemplate": "docker",
+      "managerFilePatterns": [
+        "**/*_test.go"
+      ],
+      "matchStrings": [
+        "grafana/k6:(?<currentValue>[\\w.-]+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "ghcr.io/grafana/chromium-swiftshader-alpine"
+      ],
+      "versioning": "loose"
+    }
+  ]
+}

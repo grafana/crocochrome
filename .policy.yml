@@ -9,6 +9,7 @@ policy:
     - or:
         - and:
             - Workflow .github/workflows/push-pr.yaml succeeded or skipped
+            - Workflow .github/workflows/renovate-approve.yaml succeeded or skipped
             - Workflow .github/workflows/renovate-validate.yaml succeeded or skipped
             - Workflow .github/workflows/validate-policy-bot-config.yml succeeded or skipped
             - default to approval
@@ -17,6 +18,9 @@ policy:
 approval_rules:
   - name: Workflow .github/workflows/push-pr.yaml succeeded or skipped
     if:
+      file_not_deleted:
+        paths:
+          - ^\.github\/workflows\/push-pr\.yaml$
       targets_branch:
         pattern: (^main$)
     requires:
@@ -27,6 +31,19 @@ approval_rules:
             - success
           workflows:
             - .github/workflows/push-pr.yaml
+  - name: Workflow .github/workflows/renovate-approve.yaml succeeded or skipped
+    if:
+      file_not_deleted:
+        paths:
+          - ^\.github\/workflows\/renovate-approve\.yaml$
+    requires:
+      conditions:
+        has_workflow_result:
+          conclusions:
+            - skipped
+            - success
+          workflows:
+            - .github/workflows/renovate-approve.yaml
   - name: Workflow .github/workflows/renovate-validate.yaml succeeded or skipped
     if:
       changed_files:
@@ -34,7 +51,12 @@ approval_rules:
           - ^renovate\.(?:[^/]*)$
           - ^\.renovate\.(?:[^/]*)$
           - ^\.github\/renovate\.(?:[^/]*)$
-          - ^\.github\/workflows\/renovate(?:[^/]*)$
+          - ^scripts\/check-renovate-config$
+          - ^scripts\/generate-renovate-config$
+          - ^\.github\/workflows\/renovate-validate\.yaml$
+      file_not_deleted:
+        paths:
+          - ^\.github\/workflows\/renovate-validate\.yaml$
     requires:
       conditions:
         has_workflow_result:
@@ -48,6 +70,12 @@ approval_rules:
       changed_files:
         paths:
           - ^\.policy\.yml$
+          - ^\.github\/workflows\/validate-policy-bot-config\.yml$
+          - ^scripts\/check-policy-bot-config$
+          - ^scripts\/gen-policy-bot-config$
+      file_not_deleted:
+        paths:
+          - ^\.github\/workflows\/validate-policy-bot-config\.yml$
     requires:
       conditions:
         has_workflow_result:
