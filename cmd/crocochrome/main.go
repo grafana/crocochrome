@@ -24,8 +24,9 @@ import (
 )
 
 type Config struct {
-	UserGroup int
-	TempDir   string
+	UserGroup         int
+	TempDir           string
+	HeapProbeInterval time.Duration
 }
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	config := &Config{}
 	flag.StringVar(&config.TempDir, "temp-dir", "/chromium-tmp", "Directory for chromiumium instances to write their data to")
 	flag.IntVar(&config.UserGroup, "user-group", 65534, "Default user to run as. For local development, set this flag to 0")
+	flag.DurationVar(&config.HeapProbeInterval, "heap-probe-interval", 10*time.Second, "CDP heap probe cadence for V8/DOM metrics. Set to 0 to disable.")
 
 	flag.Parse()
 	if err := run(logger, config); err != nil {
@@ -66,10 +68,15 @@ func run(logger *slog.Logger, config *Config) error {
 		// /chromium-tmp instead. We do this to make sure we are not accidentally allowing things we don't know about
 		// to be written, as it is safe to assume that anything writing here (the only writable path) is doing so
 		// because we told it to.
-		TempDir:      config.TempDir,
-		Registry:     registry,
-		ExtraUATerms: "GrafanaSyntheticMonitoring",
+		TempDir:           config.TempDir,
+		Registry:          registry,
+		ExtraUATerms:      "GrafanaSyntheticMonitoring",
+		HeapProbeInterval: config.HeapProbeInterval,
 	})
+
+	if config.HeapProbeInterval > 0 {
+		metrics.NewHeapCollector(registry, supervisor)
+	}
 
 	err := supervisor.ComputeUserAgent(context.Background())
 	if err != nil {
