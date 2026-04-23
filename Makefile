@@ -148,3 +148,6 @@ clean: ## Clean up intermediate build artifacts.
 distclean: clean ## Clean up all build artifacts.
 	$(S) echo "Cleaning all build artifacts..."
 	$(V) git clean -Xf
+
+include scripts/make/620_generate_policy_bot_config.mk
+include scripts/make/630_generate_renovate_config.mk

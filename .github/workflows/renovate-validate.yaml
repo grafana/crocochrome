@@ -6,8 +6,9 @@ on:
       - "renovate.*"
       - ".renovate.*"
       - ".github/renovate.*"
-      # Also when renovate version changes:
-      - ".github/workflows/renovate*"
+      - scripts/check-renovate-config
+      - scripts/generate-renovate-config
+      - .github/workflows/renovate-validate.yaml
 
 permissions:
   contents: none
@@ -18,7 +19,7 @@ jobs:
       # Needed for logging into vault.
       contents: read
       id-token: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-amd64-small
     timeout-minutes: 5
     steps:
       - name: Checkout Code
@@ -26,5 +27,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Self-hosted renovate
-        uses: grafana/sm-renovate/actions/renovate-validate@main
+      - name: Check drift
+        run: |
+          ./scripts/generate-renovate-config
+
+          ./scripts/check-renovate-config "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate Renovate Config
+        uses: grafana/shared-workflows/actions/validate-renovate-config@726f1a912f45b4807774b76a6d40cbd3fb7a12c0 # validate-renovate-config/v0.1.2
+        with:
+          path: .github/renovate.json
