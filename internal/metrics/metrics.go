@@ -83,6 +83,7 @@ type SupervisorMetrics struct {
 	SessionDuration    prometheus.Histogram
 	ChromiumExecutions *prometheus.CounterVec
 	ChromiumResources  *prometheus.HistogramVec
+	HeapProbeErrors    prometheus.Counter
 }
 
 // Supervisor registers and returns handlers for metrics used by the supervisor.
@@ -125,11 +126,20 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 			},
 			[]string{Resource},
 		),
+		HeapProbeErrors: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "heap_probe_errors_total",
+				Help:      "Total number of CDP heap probe failures. Spikes here mean the probe goroutine couldn't reach chromium or a CDP call errored; session lifecycle itself is unaffected.",
+			},
+		),
 	}
 
 	reg.MustRegister(m.SessionDuration)
 	reg.MustRegister(m.ChromiumExecutions)
 	reg.MustRegister(m.ChromiumResources)
+	reg.MustRegister(m.HeapProbeErrors)
 
 	return m
 }

@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,7 +33,8 @@ type Supervisor struct {
 	// when a new one is creating (by traversing this map).
 	// Despite this decision of allowing only one session at a time, we wanted the design of Supervisor and its HTTP
 	// API to not be strongly coupled to this decision, hence the use of a map here instead of a single CancelFunc.
-	sessions    map[string]session
+	// Sessions are stored by pointer so the probe goroutine and the metrics collector see the same heapSnapshot.
+	sessions    map[string]*session
 	sessionsMtx sync.Mutex
 	metrics     *metrics.SupervisorMetrics
 	// userAgent stores a "patched" user agent derived from the default UA for the installed chromium. We "patch" the
@@ -65,6 +67,9 @@ type Options struct {
 	// ExtraUATerms is appended, after a space, to the chromium user agent. It can be used to add vendor-specific
 	// information to it, such as the name of the product using chromium to perform requests.
 	ExtraUATerms string
+	// HeapProbeInterval is how often the CDP heap prober samples V8/DOM metrics from the active chromium session.
+	// Zero (the default) disables heap probing entirely.
+	HeapProbeInterval time.Duration
 }
 
 const (
@@ -118,6 +123,12 @@ type session struct {
 	info *SessionInfo
 	// cancel is the CancelFunc for this session, called on Delete and when the session times out.
 	cancel context.CancelFunc
+	// labels are the allowlisted metadata values (regionID, tenantID, id) captured from the client's
+	// POST /sessions body. Immutable once Create returns, so safe to read without locks.
+	labels map[string]string
+	// heapSnapshot holds the latest heap probe result. Nil until the first successful probe.
+	// Read by the metrics collector at scrape time.
+	heapSnapshot atomic.Pointer[chromium.HeapSnapshot]
 }
 
 func New(logger *slog.Logger, opts Options) *Supervisor {
@@ -127,7 +138,7 @@ func New(logger *slog.Logger, opts Options) *Supervisor {
 		opts:     opts,
 		logger:   logger,
 		cclient:  chromium.NewClient(),
-		sessions: map[string]session{},
+		sessions: map[string]*session{},
 		metrics:  metrics.Supervisor(opts.Registry),
 		wg:       &sync.WaitGroup{},
 	}
@@ -174,9 +185,15 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	id := randString()
 	logger := s.logger.With("sessionID", id)
 
+	labels := map[string]string{}
 	for k, v := range checkInfo.Metadata {
 		if slices.Contains(allowedLabels, k) {
 			logger = logger.With(k, v)
+			if s, ok := v.(string); ok {
+				labels[k] = s
+			} else {
+				labels[k] = fmt.Sprint(v)
+			}
 		}
 	}
 
@@ -223,12 +240,49 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 		ChromiumVersion: *version,
 	}
 
-	s.sessions[id] = session{
+	sess := &session{
 		cancel: cancel,
 		info:   &si,
+		labels: labels,
+	}
+	s.sessions[id] = sess
+
+	if s.opts.HeapProbeInterval > 0 {
+		prober := &chromium.HeapProber{BrowserWSURL: version.WebSocketDebuggerURL}
+		go s.probeHeap(ctx, logger, sess, prober)
 	}
 
 	return si, nil
+}
+
+// probeHeap polls the chromium CDP endpoint on a ticker until ctx is cancelled, storing the most recent
+// snapshot on the session for the metrics collector to read at scrape time. The first tick fires
+// immediately so the collector has data to expose early in the session.
+func (s *Supervisor) probeHeap(ctx context.Context, logger *slog.Logger, sess *session, prober *chromium.HeapProber) {
+	tick := time.NewTicker(s.opts.HeapProbeInterval)
+	defer tick.Stop()
+
+	for {
+		// Bound each probe to one interval so a hung CDP call can't wedge the goroutine across ticks.
+		probeCtx, cancel := context.WithTimeout(ctx, s.opts.HeapProbeInterval)
+		snap, err := prober.Probe(probeCtx)
+		cancel()
+
+		if err != nil {
+			if ctx.Err() == nil {
+				s.metrics.HeapProbeErrors.Inc()
+				logger.Debug("heap probe failed", "err", err)
+			}
+		} else if snap.PageTargets > 0 {
+			sess.heapSnapshot.Store(&snap)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
 }
 
 // Delete cancels a session's context and removes it from the map.
@@ -242,6 +296,24 @@ func (s *Supervisor) Delete(sessionID string) bool {
 // Wait blocks until there are no sessions running.
 func (s *Supervisor) Wait() {
 	s.wg.Wait()
+}
+
+// ActiveHeapSnapshot returns the most recent heap snapshot and label set from the currently-active session.
+// Returns (nil, nil, false) when no session is active or the active session has not yet produced a snapshot.
+// Used by the heap metrics collector at scrape time.
+func (s *Supervisor) ActiveHeapSnapshot() (*chromium.HeapSnapshot, map[string]string, bool) {
+	s.sessionsMtx.Lock()
+	defer s.sessionsMtx.Unlock()
+
+	for _, sess := range s.sessions {
+		snap := sess.heapSnapshot.Load()
+		if snap == nil {
+			return nil, nil, false
+		}
+		return snap, sess.labels, true
+	}
+
+	return nil, nil, false
 }
 
 // delete cancels a session's context and removes it from the map, without locking the mutex.
