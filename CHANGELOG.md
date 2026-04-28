@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.10.3](https://github.com/grafana/crocochrome/compare/v0.10.2...v0.10.3) (2026-04-24)
+
+
+### Fixes
+
+* Clean up dependency management ([#439](https://github.com/grafana/crocochrome/issues/439)) ([17c3057](https://github.com/grafana/crocochrome/commit/17c305764b4810cc50a033dcda147fead68157a5))
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/get-vault-secrets action to v1.3.1 ([#441](https://github.com/grafana/crocochrome/issues/441)) ([dbf6050](https://github.com/grafana/crocochrome/commit/dbf60500f8823465744723978e86031471a335d9))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v147 ([#437](https://github.com/grafana/crocochrome/issues/437)) ([3b9df4b](https://github.com/grafana/crocochrome/commit/3b9df4b9a6d18684449dcf6a9d2611cf29508f34))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v147.0.7727.101-r0-3.23.4 ([#442](https://github.com/grafana/crocochrome/issues/442)) ([90c8bdc](https://github.com/grafana/crocochrome/commit/90c8bdc0910d7a7c576a10d67252ccedd45d2a0c))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.37.0 ([#443](https://github.com/grafana/crocochrome/issues/443)) ([548ad91](https://github.com/grafana/crocochrome/commit/548ad919bad9f6089a08f5fd2693a614371d74f8))
+
 ## [0.10.2](https://github.com/grafana/crocochrome/compare/v0.10.1...v0.10.2) (2026-04-16)
 
 
