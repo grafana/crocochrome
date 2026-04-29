@@ -109,11 +109,11 @@ func TestCgroupV1MemoryOOMControlPath(t *testing.T) {
 	t.Run("extracts memory controller path", func(t *testing.T) {
 		t.Parallel()
 
-		f := writeTempFile(t, `11:blkio:/kubepods
+		root := newFakeProcFS(t, `11:blkio:/kubepods
 12:memory:/kubepods/besteffort/podabc123/container456
 13:cpu,cpuacct:/kubepods
 `)
-		got := crocochrome.CgroupV1MemoryOOMControlPath(f)
+		got := crocochrome.CgroupV1MemoryOOMControlPath(root)
 		want := "/sys/fs/cgroup/memory/kubepods/besteffort/podabc123/container456/memory.oom_control"
 
 		if got != want {
@@ -124,21 +124,44 @@ func TestCgroupV1MemoryOOMControlPath(t *testing.T) {
 	t.Run("returns empty string when memory controller is absent", func(t *testing.T) {
 		t.Parallel()
 
-		f := writeTempFile(t, `11:blkio:/kubepods
+		root := newFakeProcFS(t, `11:blkio:/kubepods
 13:cpu,cpuacct:/kubepods
 `)
-		if got := crocochrome.CgroupV1MemoryOOMControlPath(f); got != "" {
+		if got := crocochrome.CgroupV1MemoryOOMControlPath(root); got != "" {
 			t.Fatalf("expected empty string, got %q", got)
 		}
 	})
 
-	t.Run("returns empty string for non-existent file", func(t *testing.T) {
+	t.Run("returns empty string for non-existent procfs root", func(t *testing.T) {
 		t.Parallel()
 
 		if got := crocochrome.CgroupV1MemoryOOMControlPath("/does/not/exist"); got != "" {
 			t.Fatalf("expected empty string, got %q", got)
 		}
 	})
+}
+
+// newFakeProcFS creates a tempdir that procfs.NewFS will accept as a procfs root,
+// containing a single pid directory with the given /proc/<pid>/cgroup contents and
+// a "self" symlink pointing at it. Returns the root path.
+func newFakeProcFS(t *testing.T, cgroupContents string) string {
+	t.Helper()
+
+	root := t.TempDir()
+	const pid = "1234"
+
+	pidDir := filepath.Join(root, pid)
+	if err := os.MkdirAll(pidDir, 0o755); err != nil {
+		t.Fatalf("creating pid dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pidDir, "cgroup"), []byte(cgroupContents), 0o600); err != nil {
+		t.Fatalf("writing cgroup file: %v", err)
+	}
+	if err := os.Symlink(pid, filepath.Join(root, "self")); err != nil {
+		t.Fatalf("creating self symlink: %v", err)
+	}
+
+	return root
 }
 
 // writeTempFile writes content to a uniquely-named temp file and returns its path.

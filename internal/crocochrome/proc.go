@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs"
 )
 
 // processInfo holds OS-level information for a single process in the Chromium process tree.
@@ -106,48 +108,32 @@ func chromiumProcessType(pid int, procRoot string) string {
 	}
 }
 
-// processMemoryStats reads /proc/<pid>/status and returns the current RSS (VmRSS) and
-// peak RSS (VmHWM) in bytes. Both fields are parsed in a single pass; no extra syscall
-// is needed. Values are in KiB in the status file; this function converts to bytes.
+// processMemoryStats returns the current RSS (VmRSS) and peak RSS (VmHWM) in bytes for
+// the given pid, parsed from /proc/<pid>/status via prometheus/procfs.
 //
 // VmHWM (high-water mark) is the peak RSS since the process started. Since Chromium
 // subprocesses are spawned fresh per session, VmHWM is effectively the session peak.
 func processMemoryStats(pid int, procRoot string) (rss, peakRSS int64, _ error) {
-	data, err := os.ReadFile(filepath.Join(procRoot, strconv.Itoa(pid), "status"))
+	fs, err := procfs.NewFS(procRoot)
+	if err != nil {
+		return 0, 0, fmt.Errorf("opening procfs at %q: %w", procRoot, err)
+	}
+
+	p, err := fs.Proc(pid)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	for _, line := range strings.Split(string(data), "\n") {
-		switch {
-		case strings.HasPrefix(line, "VmRSS:"):
-			fields := strings.Fields(line)
-			if len(fields) < 2 {
-				return 0, 0, fmt.Errorf("unexpected VmRSS line format: %q", line)
-			}
-			kb, err := strconv.ParseInt(fields[1], 10, 64)
-			if err != nil {
-				return 0, 0, fmt.Errorf("parsing VmRSS value %q: %w", fields[1], err)
-			}
-			rss = kb * 1024
-		case strings.HasPrefix(line, "VmHWM:"):
-			fields := strings.Fields(line)
-			if len(fields) < 2 {
-				return 0, 0, fmt.Errorf("unexpected VmHWM line format: %q", line)
-			}
-			kb, err := strconv.ParseInt(fields[1], 10, 64)
-			if err != nil {
-				return 0, 0, fmt.Errorf("parsing VmHWM value %q: %w", fields[1], err)
-			}
-			peakRSS = kb * 1024
-		}
+	st, err := p.NewStatus()
+	if err != nil {
+		return 0, 0, err
 	}
 
-	if rss == 0 && peakRSS == 0 {
+	if st.VmRSS == 0 && st.VmHWM == 0 {
 		return 0, 0, fmt.Errorf("VmRSS/VmHWM not found in /proc/%d/status", pid)
 	}
 
-	return rss, peakRSS, nil
+	return int64(st.VmRSS), int64(st.VmHWM), nil
 }
 
 // collectProcessMetrics walks cgroup.procs and returns per-process info plus the total
