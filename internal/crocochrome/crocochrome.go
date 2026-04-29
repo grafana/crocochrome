@@ -65,6 +65,11 @@ type Options struct {
 	// ExtraUATerms is appended, after a space, to the chromium user agent. It can be used to add vendor-specific
 	// information to it, such as the name of the product using chromium to perform requests.
 	ExtraUATerms string
+	// CgroupMemoryEventsPath is the path to the cgroup memory events file used to detect OOM kills.
+	// If empty, the path is auto-detected (cgroupsv2: /sys/fs/cgroup/memory.events,
+	// cgroupsv1: /sys/fs/cgroup/memory/<hierarchy>/memory.oom_control).
+	// Set to a non-existent path to disable OOM detection (e.g. in tests that do not need it).
+	CgroupMemoryEventsPath string
 }
 
 const (
@@ -94,6 +99,10 @@ func (o Options) withDefaults() Options {
 
 	if o.Registry == nil {
 		o.Registry = prometheus.NewRegistry() // Empty, unused.
+	}
+
+	if o.CgroupMemoryEventsPath == "" {
+		o.CgroupMemoryEventsPath = detectCgroupMemoryEventsPath()
 	}
 
 	return o
@@ -342,7 +351,30 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
+	// Sample the cgroup OOM kill counter before launching Chromium so we can detect
+	// any OOM kills that occur during this session (as opposed to prior sessions).
+	oomBefore, oomBeforeErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath)
+	if oomBeforeErr != nil {
+		logger.Warn("could not read cgroup OOM kill count before session", "err", oomBeforeErr)
+	}
+
 	err = cmd.Run()
+
+	// Check whether the OOM killer fired during this session. Skip the comparison if the
+	// baseline read failed — incrementing against an unknown baseline (implicitly 0) would
+	// produce false positives. Also guard against counter wraparound/reset which would
+	// manifest as oomAfter < oomBefore.
+	if oomBeforeErr == nil {
+		if oomAfter, oomErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath); oomErr != nil {
+			logger.Warn("could not read cgroup OOM kill count after session", "err", oomErr)
+		} else if oomAfter < oomBefore {
+			logger.Warn("cgroup OOM kill counter decreased unexpectedly (counter reset or cgroup recreated?)",
+				"before", oomBefore, "after", oomAfter)
+		} else if delta := oomAfter - oomBefore; delta > 0 {
+			logger.Warn("OOM kill(s) detected during session", "oomKills", delta)
+			s.metrics.OOMKills.Add(float64(delta))
+		}
+	}
 
 	attrs := make([]slog.Attr, 0, 9)
 

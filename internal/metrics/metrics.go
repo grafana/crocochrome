@@ -83,6 +83,11 @@ type SupervisorMetrics struct {
 	SessionDuration    prometheus.Histogram
 	ChromiumExecutions *prometheus.CounterVec
 	ChromiumResources  *prometheus.HistogramVec
+	// OOMKills counts the number of times the kernel OOM-killer fired within the container's
+	// cgroup during a Chromium session. A non-zero value indicates that Chromium's multi-process
+	// tree (renderer, GPU process, etc.) exceeded the container memory limit and had one or more
+	// processes killed, even if crocochrome itself survived.
+	OOMKills prometheus.Counter
 }
 
 // Supervisor registers and returns handlers for metrics used by the supervisor.
@@ -125,11 +130,22 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 			},
 			[]string{Resource},
 		),
+		OOMKills: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "chromium_oom_kills_total",
+				Help: "Total number of times the kernel OOM-killer fired within the container cgroup " +
+					"during a Chromium session. Incremented when the oom_kill counter in the cgroup " +
+					"memory events file increases between session start and session end.",
+			},
+		),
 	}
 
 	reg.MustRegister(m.SessionDuration)
 	reg.MustRegister(m.ChromiumExecutions)
 	reg.MustRegister(m.ChromiumResources)
+	reg.MustRegister(m.OOMKills)
 
 	return m
 }
