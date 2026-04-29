@@ -187,7 +187,15 @@ func cdpPerformanceMetrics(ctx context.Context, wsURL string) ([]slog.Attr, erro
 // discarding unsolicited event messages (id == 0 or missing). Returns an error if the
 // response contains a CDP-level error.
 func readCDPResponse(conn *websocket.Conn, expectedID int) error {
-	return readCDPResponseInto(conn, expectedID, nil)
+	var resp cdpResponse
+	if err := readCDPResponseInto(conn, expectedID, &resp); err != nil {
+		return err
+	}
+	if resp.Error != nil {
+		return fmt.Errorf("CDP error %d: %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	return nil
 }
 
 // readCDPResponseInto is like readCDPResponse but unmarshals the matched message into dst

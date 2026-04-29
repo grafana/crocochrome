@@ -97,6 +97,26 @@ func TestReadCDPResponseInto_skipsWrongIDMessages(t *testing.T) {
 	}
 }
 
+func TestReadCDPResponse_returnsCDPError(t *testing.T) {
+	clientConn := cdpTestServer(t, func(serverConn *websocket.Conn) {
+		_ = serverConn.WriteJSON(map[string]any{
+			"id": 1,
+			"error": map[string]any{
+				"code":    -32000,
+				"message": "Performance domain unavailable",
+			},
+		})
+	})
+
+	err := readCDPResponse(clientConn, 1)
+	if err == nil {
+		t.Fatal("expected CDP error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Performance domain unavailable") {
+		t.Fatalf("expected error message to include CDP error, got %v", err)
+	}
+}
+
 func TestReadCDPResponseInto_skipsMalformedJSON(t *testing.T) {
 	// Malformed JSON frames should be skipped without returning an error.
 

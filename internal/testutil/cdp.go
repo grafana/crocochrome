@@ -85,26 +85,6 @@ var CDPPerformanceMetrics = map[string]float64{
 	"Documents":       3,
 }
 
-// ChromiumVersionHandlerWithCDP returns an http.HandlerFunc that serves /json/version
-// responses with webSocketDebuggerUrl pointing to wsURL.
-// Use this together with CDPServer to wire up a complete fake Chromium for tests that
-// exercise the CDP performance metrics collection path.
-func ChromiumVersionHandlerWithCDP(wsURL string) http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		resp := map[string]string{
-			"Browser":              "HeadlessChrome/124.0.6367.207",
-			"Protocol-Version":     "1.3",
-			"User-Agent":           "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-			"V8-Version":           "12.4.254.15",
-			"WebKit-Version":       "537.36",
-			"webSocketDebuggerUrl": wsURL,
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(rw).Encode(resp)
-	}
-}
-
 // StartChromiumWithTargets starts an httptest.Server that serves both /json/version and
 // /json/list, mirroring real Chromium's debug server where both endpoints share one port.
 // The webSocketDebuggerUrl in /json/version automatically points back to this same server,

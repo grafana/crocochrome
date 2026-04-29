@@ -302,6 +302,51 @@ func TestCrocochrome(t *testing.T) {
 		}
 	})
 
+	t.Run("logs renderer count with only CDP metrics enabled", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+		hb := testutil.NewHeartbeat(t)
+		cdpURL := testutil.CDPServer(t)
+		targets := []testutil.CDPTargetInfo{
+			{URL: "https://example.com", WebSocketDebuggerURL: cdpURL},
+			{URL: "https://other.com", WebSocketDebuggerURL: cdpURL},
+		}
+		port := testutil.StartChromiumWithTargets(t, targets)
+
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:     hb.Path,
+			ChromiumPort:     port,
+			EnableCDPMetrics: true,
+		})
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		cc.Delete(sess.ID)
+		cc.Wait()
+
+		logs := buf.String()
+		for _, want := range []string{
+			"chromium session memory",
+			"rendererCount=2",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+		for _, forbidden := range []string{"cgroupRSS=", "processCount="} {
+			if strings.Contains(logs, forbidden) {
+				t.Errorf("unexpected %q in logs\nLogs:\n%s", forbidden, logs)
+			}
+		}
+		hb.AssertAliveDead(0, 1)
+	})
+
 	t.Run("increments OOM kill counter when cgroup reports a kill during session", func(t *testing.T) {
 		t.Parallel()
 

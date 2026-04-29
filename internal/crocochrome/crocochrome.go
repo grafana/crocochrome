@@ -73,7 +73,7 @@ type Options struct {
 	// EnableProcessMetrics enables per-process RSS collection at session teardown.
 	// When true, Delete() walks cgroup.procs and reads VmRSS and VmHWM from
 	// /proc/<pid>/status for each process, emitting "chromium process memory" log entries
-	// and a "chromium session memory" summary with the cgroup-level total.
+	// and adds the cgroup-level total to the "chromium session memory" summary.
 	// This is fast (file reads only, no network) and adds negligible overhead to DELETE.
 	// Disabled by default; enable via the -process-metrics flag.
 	EnableProcessMetrics bool
@@ -273,11 +273,13 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 //
 //   - EnableProcessMetrics: walks cgroup.procs, reads VmRSS/VmHWM per process, reads
 //     the cgroup total from memory.current. Fast file reads; negligible overhead.
-//     Emits "chromium process memory" entries and a "chromium session memory" summary.
+//     Emits "chromium process memory" entries and adds process totals to the
+//     "chromium session memory" summary.
 //
 //   - EnableCDPMetrics: enumerates page targets via /json/list and calls
 //     Performance.getMetrics on each renderer. Adds up to 300ms to DELETE.
-//     Emits "chromium renderer metrics" entries.
+//     Emits "chromium renderer metrics" entries and adds renderer counts to the
+//     "chromium session memory" summary.
 //
 // All collection is best-effort; errors are logged at Debug and do not affect teardown.
 // When Delete is called concurrently for the same session (explicit DELETE racing the
@@ -351,12 +353,18 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium renderer metrics", attrs...)
 	}
 
-	if s.opts.EnableProcessMetrics {
-		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
-			slog.Int64("cgroupRSS", cgroupRSS),
-			slog.Int("rendererCount", len(renderers)),
-			slog.Int("processCount", len(processes)),
-		)
+	if s.opts.EnableProcessMetrics || s.opts.EnableCDPMetrics {
+		attrs := make([]slog.Attr, 0, 3)
+		if s.opts.EnableProcessMetrics {
+			attrs = append(attrs,
+				slog.Int64("cgroupRSS", cgroupRSS),
+				slog.Int("processCount", len(processes)),
+			)
+		}
+		if s.opts.EnableCDPMetrics {
+			attrs = append(attrs, slog.Int("rendererCount", len(renderers)))
+		}
+		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory", attrs...)
 	}
 
 	return true
