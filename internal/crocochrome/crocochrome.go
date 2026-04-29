@@ -111,12 +111,12 @@ func (o Options) withDefaults() Options {
 		o.Registry = prometheus.NewRegistry() // Empty, unused.
 	}
 
-	if o.CgroupMemoryEventsPath == "" {
-		o.CgroupMemoryEventsPath = detectCgroupMemoryEventsPath()
-	}
-
 	if o.ProcFSRoot == "" {
 		o.ProcFSRoot = "/proc"
+	}
+
+	if o.CgroupMemoryEventsPath == "" {
+		o.CgroupMemoryEventsPath = detectCgroupMemoryEventsPath(o.ProcFSRoot)
 	}
 
 	return o

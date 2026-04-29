@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs"
 )
 
 const (
@@ -18,9 +20,6 @@ const (
 	// cgroupV1OOMControl is the path template for the cgroups v1 memory OOM control file.
 	// The actual path is constructed by reading /proc/self/cgroup.
 	cgroupV1OOMControl = "/sys/fs/cgroup/memory%s/memory.oom_control"
-
-	// procSelfCgroup is the standard path for the calling process's cgroup memberships.
-	procSelfCgroup = "/proc/self/cgroup"
 )
 
 // detectCgroupMemoryEventsPath returns the path to the file that contains the cgroup OOM kill
@@ -31,36 +30,37 @@ const (
 //  1. cgroupsv2: /sys/fs/cgroup/memory.events
 //  2. cgroupsv1: /sys/fs/cgroup/memory/<hierarchy-path>/memory.oom_control (derived from
 //     /proc/self/cgroup)
-func detectCgroupMemoryEventsPath() string {
+func detectCgroupMemoryEventsPath(procRoot string) string {
 	if _, err := os.Stat(cgroupV2MemoryEvents); err == nil {
 		return cgroupV2MemoryEvents
 	}
 
-	return cgroupV1MemoryOOMControlPath(procSelfCgroup)
+	return cgroupV1MemoryOOMControlPath(procRoot)
 }
 
-// cgroupV1MemoryOOMControlPath reads procSelfCgroupPath (/proc/self/cgroup) and returns the
-// memory.oom_control path for the memory controller hierarchy, or "" if it cannot be found.
-func cgroupV1MemoryOOMControlPath(procSelfCgroupPath string) string {
-	f, err := os.Open(procSelfCgroupPath)
+// cgroupV1MemoryOOMControlPath resolves the calling process's cgroupv1 memory hierarchy
+// via prometheus/procfs and returns the memory.oom_control path for that hierarchy, or
+// "" if the memory controller is not found or procfs cannot be opened.
+func cgroupV1MemoryOOMControlPath(procRoot string) string {
+	fs, err := procfs.NewFS(procRoot)
 	if err != nil {
 		return ""
 	}
-	defer f.Close() //nolint:errcheck
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		// Format: <hierarchy-id>:<controller-list>:<cgroup-path>
-		// e.g.   12:memory:/kubepods/besteffort/pod.../container-id
-		parts := strings.SplitN(scanner.Text(), ":", 3)
-		if len(parts) != 3 {
-			continue
-		}
+	self, err := fs.Self()
+	if err != nil {
+		return ""
+	}
 
-		controllers := strings.Split(parts[1], ",")
-		for _, c := range controllers {
+	cgs, err := self.Cgroups()
+	if err != nil {
+		return ""
+	}
+
+	for _, cg := range cgs {
+		for _, c := range cg.Controllers {
 			if c == "memory" {
-				return fmt.Sprintf(cgroupV1OOMControl, parts[2])
+				return fmt.Sprintf(cgroupV1OOMControl, cg.Path)
 			}
 		}
 	}

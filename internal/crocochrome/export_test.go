@@ -6,4 +6,4 @@ package crocochrome
 var ReadOOMKillCount func(path string) (uint64, error) = readOOMKillCount
 
 // CgroupV1MemoryOOMControlPath is the test-visible alias for cgroupV1MemoryOOMControlPath.
-var CgroupV1MemoryOOMControlPath func(procSelfCgroupPath string) string = cgroupV1MemoryOOMControlPath
+var CgroupV1MemoryOOMControlPath func(procRoot string) string = cgroupV1MemoryOOMControlPath
