@@ -194,12 +194,12 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 		// session has already been removed.
 		logger.Debug("context cancelled, removing session from the map")
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
-		s.wg.Done()
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
 	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
 	go func() {
+		defer s.wg.Done()
 		err := s.launch(ctx, logger)
 		if err != nil {
 			logger.Error("launching chromium", "err", err)
