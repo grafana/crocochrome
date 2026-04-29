@@ -77,6 +77,12 @@ type Options struct {
 	// This is fast (file reads only, no network) and adds negligible overhead to DELETE.
 	// Disabled by default; enable via the -process-metrics flag.
 	EnableProcessMetrics bool
+	// EnableCDPMetrics enables CDP Performance.getMetrics collection at session teardown.
+	// When true, Delete() enumerates page targets via /json/list and opens a DevTools
+	// WebSocket to each renderer, logging JS heap, DOM nodes, and timing counters.
+	// Adds up to 300ms overhead to DELETE /sessions. Enable via the -cdp-metrics flag.
+	// The collection is best-effort: errors are logged at Debug level and do not affect teardown.
+	EnableCDPMetrics bool
 	// ProcFSRoot is the root of the proc filesystem used for per-process RSS and cmdline reads.
 	// Defaults to "/proc". Override in tests to point at a temp directory.
 	ProcFSRoot string
@@ -141,8 +147,9 @@ type session struct {
 	info *SessionInfo
 	// cancel is the CancelFunc for this session, called on Delete and when the session times out.
 	cancel context.CancelFunc
-	// logger is the session-scoped logger enriched with sessionID, regionID, tenantID, and check id.
-	// Constructed in Create and used in goroutines that outlive it (e.g. Delete).
+	// logger is the session-scoped logger (carries sessionID, regionID, tenantID, check id).
+	// Used to emit per-session log entries from paths that do not have direct access to the
+	// logger constructed in Create (e.g. Delete).
 	logger *slog.Logger
 }
 
@@ -224,8 +231,11 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 
 	// Launch chromium and wait for it to finish asynchronously.
 	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
+	// wg.Done is called here (not in the AfterFunc above) so that Wait() only returns once all
+	// post-process cleanup work (OOM counter sampling, tmpdir removal, metrics emission) has completed.
 	go func() {
 		defer s.wg.Done()
+
 		err := s.launch(ctx, logger)
 		if err != nil {
 			logger.Error("launching chromium", "err", err)
@@ -259,9 +269,17 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 }
 
 // Delete cancels a session's context and removes it from the map.
-// When -process-metrics is enabled, it collects per-process RSS from cgroup.procs before
-// sending SIGKILL, emitting "chromium process memory" log entries and a "chromium session
-// memory" summary. Collection is fast (file reads only) and best-effort.
+// Observability collection before SIGKILL is controlled by two independent flags:
+//
+//   - EnableProcessMetrics: walks cgroup.procs, reads VmRSS/VmHWM per process, reads
+//     the cgroup total from memory.current. Fast file reads; negligible overhead.
+//     Emits "chromium process memory" entries and a "chromium session memory" summary.
+//
+//   - EnableCDPMetrics: enumerates page targets via /json/list and calls
+//     Performance.getMetrics on each renderer. Adds up to 300ms to DELETE.
+//     Emits "chromium renderer metrics" entries.
+//
+// All collection is best-effort; errors are logged at Debug and do not affect teardown.
 // When Delete is called concurrently for the same session (explicit DELETE racing the
 // AfterFunc timeout), both callers collect independently but only the goroutine that wins
 // the s.delete race emits log entries, deduplicating output.
@@ -275,11 +293,13 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		return false
 	}
 
+	wsURL := sess.info.ChromiumVersion.WebSocketDebuggerURL
 	sessLogger := sess.logger
 
 	var (
 		processes []processInfo
 		cgroupRSS int64
+		renderers []rendererMetrics
 	)
 
 	// Per-process RSS — fast file reads only, no context or timeout required.
@@ -289,6 +309,19 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		if procErr != nil {
 			sessLogger.Debug("could not collect process metrics", "err", procErr)
 		}
+	}
+
+	// Per-renderer CDP metrics — bounded by a 300ms context deadline.
+	if s.opts.EnableCDPMetrics {
+		cdpStart := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), cdpCollectTimeout)
+		var cdpErr error
+		renderers, cdpErr = cdpCollectRendererMetrics(ctx, wsURL)
+		cancel()
+		if cdpErr != nil {
+			sessLogger.Debug("could not collect renderer CDP metrics", "err", cdpErr)
+		}
+		s.metrics.CDPCollectionDuration.Observe(time.Since(cdpStart).Seconds())
 	}
 
 	// Re-acquire the lock and attempt deletion. If a concurrent caller already deleted
@@ -301,7 +334,7 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		return false
 	}
 
-	// We won the deletion race. Emit collected observability data.
+	// We won the deletion race. Emit all collected observability data.
 	// context.Background() is intentional: the session context is now cancelled and some
 	// slog handler implementations suppress output when the context is done.
 	for _, p := range processes {
@@ -313,9 +346,15 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		)
 	}
 
+	for _, r := range renderers {
+		attrs := append([]slog.Attr{slog.String("targetURL", r.TargetURL)}, r.Attrs...)
+		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium renderer metrics", attrs...)
+	}
+
 	if s.opts.EnableProcessMetrics {
 		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
 			slog.Int64("cgroupRSS", cgroupRSS),
+			slog.Int("rendererCount", len(renderers)),
 			slog.Int("processCount", len(processes)),
 		)
 	}
