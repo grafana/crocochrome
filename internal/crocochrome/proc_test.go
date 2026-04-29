@@ -72,8 +72,13 @@ func TestChromiumProcessType(t *testing.T) {
 			want:    "browser",
 		},
 		{
-			name:    "tini supervisor",
+			name:    "tini supervisor (bare name)",
 			cmdline: "tini\x00--\x00/usr/local/bin/crocochrome\x00-cdp-metrics\x00",
+			want:    "tini",
+		},
+		{
+			name:    "tini supervisor (full path — must not misclassify as crocochrome)",
+			cmdline: "/sbin/tini\x00--\x00/usr/local/bin/crocochrome\x00-cdp-metrics\x00",
 			want:    "tini",
 		},
 		{

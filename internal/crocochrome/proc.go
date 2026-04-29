@@ -77,14 +77,27 @@ func chromiumProcessType(pid int, procRoot string) string {
 		return processType
 	}
 
-	// No --type= flag. Classify by binary name to separate the Chromium browser
-	// process from other no-flag co-residents.
+	// No --type= flag. Classify by the basename of the executable (the first
+	// argument, terminated by the first null byte or space) to separate the
+	// Chromium browser process from other no-flag co-residents.
+	//
+	// We use filepath.Base rather than a prefix check because tini may be
+	// invoked with a full path (/sbin/tini, /usr/bin/tini, etc.). A prefix
+	// check would miss those cases and fall through to the "crocochrome"
+	// branch — incorrectly — because tini's cmdline contains "crocochrome"
+	// as an argument.
+	firstArgEnd := strings.IndexAny(raw, "\x00 ")
+	var execBase string
+	if firstArgEnd == -1 {
+		execBase = filepath.Base(raw)
+	} else {
+		execBase = filepath.Base(raw[:firstArgEnd])
+	}
+
 	switch {
 	case strings.Contains(raw, "chrome_crashpad"):
 		return "crashpad"
-	case strings.HasPrefix(raw, "tini"):
-		// tini's cmdline includes its arguments (e.g. "-- /usr/local/bin/crocochrome"),
-		// so it must be matched before the "crocochrome" check below.
+	case execBase == "tini":
 		return "tini"
 	case strings.Contains(raw, "crocochrome"):
 		return "crocochrome"
