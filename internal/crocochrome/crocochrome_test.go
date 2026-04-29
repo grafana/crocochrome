@@ -280,4 +280,75 @@ sm_crocochrome_chromium_oom_kills_total 1
 			t.Errorf("OOM kill counter mismatch: %v", err)
 		}
 	})
+
+	t.Run("logs per-process metrics and session summary on Delete", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		// Set up a fake cgroup dir and proc dir so process metrics can be collected.
+		cgroupDir := t.TempDir()
+		procRoot := t.TempDir()
+
+		writeFile := func(path, content string) {
+			t.Helper()
+			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		eventsPath := cgroupDir + "/memory.events"
+		writeFile(eventsPath, "oom_kill 0\n")
+		writeFile(cgroupDir+"/cgroup.procs", "9001\n")
+		writeFile(cgroupDir+"/memory.current", "314572800\n") // 300 MiB
+
+		if err := os.MkdirAll(procRoot+"/9001", 0755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(procRoot+"/9001/cmdline", "/usr/lib/chromium/chromium\x00--no-sandbox\x00")
+		writeFile(procRoot+"/9001/status", "VmHWM:\t 250000 kB\nVmRSS:\t 200000 kB\n")
+
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:           hb.Path,
+			ChromiumPort:           port,
+			EnableProcessMetrics:   true,
+			CgroupMemoryEventsPath: eventsPath,
+			ProcFSRoot:             procRoot,
+		})
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		cc.Delete(sess.ID)
+		cc.Wait()
+
+		logs := buf.String()
+
+		for _, want := range []string{
+			"chromium process memory",
+			"pid=9001",
+			"processType=browser",
+			"peakRSS=256000000", // 250000 kB * 1024
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+
+		for _, want := range []string{
+			"chromium session memory",
+			"cgroupRSS=314572800",
+			"processCount=1",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+	})
 }

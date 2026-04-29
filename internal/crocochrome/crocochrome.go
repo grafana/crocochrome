@@ -70,6 +70,16 @@ type Options struct {
 	// cgroupsv1: /sys/fs/cgroup/memory/<hierarchy>/memory.oom_control).
 	// Set to a non-existent path to disable OOM detection (e.g. in tests that do not need it).
 	CgroupMemoryEventsPath string
+	// EnableProcessMetrics enables per-process RSS collection at session teardown.
+	// When true, Delete() walks cgroup.procs and reads VmRSS and VmHWM from
+	// /proc/<pid>/status for each process, emitting "chromium process memory" log entries
+	// and a "chromium session memory" summary with the cgroup-level total.
+	// This is fast (file reads only, no network) and adds negligible overhead to DELETE.
+	// Disabled by default; enable via the -process-metrics flag.
+	EnableProcessMetrics bool
+	// ProcFSRoot is the root of the proc filesystem used for per-process RSS and cmdline reads.
+	// Defaults to "/proc". Override in tests to point at a temp directory.
+	ProcFSRoot string
 }
 
 const (
@@ -105,6 +115,10 @@ func (o Options) withDefaults() Options {
 		o.CgroupMemoryEventsPath = detectCgroupMemoryEventsPath()
 	}
 
+	if o.ProcFSRoot == "" {
+		o.ProcFSRoot = "/proc"
+	}
+
 	return o
 }
 
@@ -127,6 +141,9 @@ type session struct {
 	info *SessionInfo
 	// cancel is the CancelFunc for this session, called on Delete and when the session times out.
 	cancel context.CancelFunc
+	// logger is the session-scoped logger enriched with sessionID, regionID, tenantID, and check id.
+	// Constructed in Create and used in goroutines that outlive it (e.g. Delete).
+	logger *slog.Logger
 }
 
 func New(logger *slog.Logger, opts Options) *Supervisor {
@@ -235,17 +252,75 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	s.sessions[id] = session{
 		cancel: cancel,
 		info:   &si,
+		logger: logger,
 	}
 
 	return si, nil
 }
 
 // Delete cancels a session's context and removes it from the map.
+// When -process-metrics is enabled, it collects per-process RSS from cgroup.procs before
+// sending SIGKILL, emitting "chromium process memory" log entries and a "chromium session
+// memory" summary. Collection is fast (file reads only) and best-effort.
+// When Delete is called concurrently for the same session (explicit DELETE racing the
+// AfterFunc timeout), both callers collect independently but only the goroutine that wins
+// the s.delete race emits log entries, deduplicating output.
 func (s *Supervisor) Delete(sessionID string) bool {
+	// Hoist the fields we need while holding the lock, then release before any I/O.
 	s.sessionsMtx.Lock()
-	defer s.sessionsMtx.Unlock()
+	sess, found := s.sessions[sessionID]
+	s.sessionsMtx.Unlock()
 
-	return s.delete(sessionID)
+	if !found {
+		return false
+	}
+
+	sessLogger := sess.logger
+
+	var (
+		processes []processInfo
+		cgroupRSS int64
+	)
+
+	// Per-process RSS — fast file reads only, no context or timeout required.
+	if s.opts.EnableProcessMetrics {
+		var procErr error
+		processes, cgroupRSS, procErr = collectProcessMetrics(s.opts.CgroupMemoryEventsPath, s.opts.ProcFSRoot)
+		if procErr != nil {
+			sessLogger.Debug("could not collect process metrics", "err", procErr)
+		}
+	}
+
+	// Re-acquire the lock and attempt deletion. If a concurrent caller already deleted
+	// this session, s.delete returns false and we emit nothing.
+	s.sessionsMtx.Lock()
+	deleted := s.delete(sessionID)
+	s.sessionsMtx.Unlock()
+
+	if !deleted {
+		return false
+	}
+
+	// We won the deletion race. Emit collected observability data.
+	// context.Background() is intentional: the session context is now cancelled and some
+	// slog handler implementations suppress output when the context is done.
+	for _, p := range processes {
+		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium process memory",
+			slog.Int("pid", p.PID),
+			slog.String("processType", p.Type),
+			slog.Int64("rss", p.RSS),
+			slog.Int64("peakRSS", p.PeakRSS),
+		)
+	}
+
+	if s.opts.EnableProcessMetrics {
+		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
+			slog.Int64("cgroupRSS", cgroupRSS),
+			slog.Int("processCount", len(processes)),
+		)
+	}
+
+	return true
 }
 
 // Wait blocks until there are no sessions running.
