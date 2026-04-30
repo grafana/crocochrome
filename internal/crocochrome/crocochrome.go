@@ -258,54 +258,71 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	return si, nil
 }
 
-// Delete cancels a session's context and removes it from the map.
-// When -process-metrics is enabled, it collects per-process RSS from cgroup.procs before
-// sending SIGKILL, emitting "chromium process memory" log entries and a "chromium session
-// memory" summary. Collection is fast (file reads only) and best-effort.
-// When Delete is called concurrently for the same session (explicit DELETE racing the
-// AfterFunc timeout), both callers collect independently but only the goroutine that wins
-// the s.delete race emits log entries, deduplicating output.
+// Delete collects teardown observability data and cancels the session context (sending
+// SIGKILL to Chromium).
+//
+// Concurrency: takeSession atomically removes the session from the map AND cancels its
+// context under the same lock. This eliminates the race window where a concurrent Create
+// could find an empty map (no session to kill) and attempt to start a new Chromium on
+// the same port while the old one was still alive. Any concurrent caller sees either the
+// session in the map (and kills it via killExisting) or the session gone with SIGKILL
+// already in flight. No intermediate state is observable.
+//
+// Observability collection happens after cancel. SIGKILL is non-blocking: the kernel
+// schedules process cleanup but does not wait for it, so Chromium and its subprocesses
+// remain present in /proc and cgroup.procs for a brief window after the signal is sent.
+// emitTeardownObservability reads during this window and treats ENOENT (process exited
+// before read) as an expected race, skipping silently.
 func (s *Supervisor) Delete(sessionID string) bool {
-	// Hoist the fields we need while holding the lock, then release before any I/O.
-	s.sessionsMtx.Lock()
-	sess, found := s.sessions[sessionID]
-	s.sessionsMtx.Unlock()
-
+	sess, found := s.takeSession(sessionID)
 	if !found {
 		return false
 	}
 
-	sessLogger := sess.logger
+	s.emitTeardownObservability(sess)
 
-	var (
-		processes []processInfo
-		cgroupRSS int64
-	)
+	return true
+}
 
-	// Per-process RSS — fast file reads only, no context or timeout required.
-	if s.opts.EnableProcessMetrics {
-		var procErr error
-		processes, cgroupRSS, procErr = collectProcessMetrics(s.opts.CgroupMemoryEventsPath, s.opts.ProcFSRoot)
-		if procErr != nil {
-			sessLogger.Debug("could not collect process metrics", "err", procErr)
-		}
-	}
-
-	// Re-acquire the lock and attempt deletion. If a concurrent caller already deleted
-	// this session, s.delete returns false and we emit nothing.
+// takeSession atomically removes the session from the map, cancels its context (sending
+// SIGKILL to Chromium), and returns the session. Both operations happen under the same
+// lock so no caller can observe the session gone from the map without SIGKILL already
+// having been sent. Returns (session{}, false) if no session with that ID exists.
+func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	s.sessionsMtx.Lock()
-	deleted := s.delete(sessionID)
-	s.sessionsMtx.Unlock()
+	defer s.sessionsMtx.Unlock()
 
-	if !deleted {
-		return false
+	sess, found := s.sessions[sessionID]
+	if !found {
+		return session{}, false
 	}
 
-	// We won the deletion race. Emit collected observability data.
-	// context.Background() is intentional: the session context is now cancelled and some
-	// slog handler implementations suppress output when the context is done.
+	delete(s.sessions, sessionID)
+	sess.cancel()
+
+	return sess, true
+}
+
+// emitTeardownObservability collects and emits process metrics for the given session.
+// Called after takeSession (SIGKILL already sent) so the window in which process data is
+// readable is brief. ENOENT on any /proc read is treated as the process having already
+// exited and is skipped silently.
+// All collection is best-effort; errors are logged at Debug and do not affect teardown.
+func (s *Supervisor) emitTeardownObservability(sess session) {
+	if !s.opts.EnableProcessMetrics {
+		return
+	}
+
+	processes, cgroupRSS, procErr := collectProcessMetrics(s.opts.CgroupMemoryEventsPath, s.opts.ProcFSRoot)
+	if procErr != nil {
+		sess.logger.Debug("could not collect process metrics", "err", procErr)
+	}
+
+	// context.Background() is intentional: the session context is already cancelled
+	// (sess.cancel was called in takeSession) and some slog handler implementations
+	// suppress output when the provided context is done.
 	for _, p := range processes {
-		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium process memory",
+		sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium process memory",
 			slog.Int("pid", p.PID),
 			slog.String("processType", p.Type),
 			slog.Int64("rss", p.RSS),
@@ -313,14 +330,10 @@ func (s *Supervisor) Delete(sessionID string) bool {
 		)
 	}
 
-	if s.opts.EnableProcessMetrics {
-		sessLogger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
-			slog.Int64("cgroupRSS", cgroupRSS),
-			slog.Int("processCount", len(processes)),
-		)
-	}
-
-	return true
+	sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
+		slog.Int64("cgroupRSS", cgroupRSS),
+		slog.Int("processCount", len(processes)),
+	)
 }
 
 // Wait blocks until there are no sessions running.
