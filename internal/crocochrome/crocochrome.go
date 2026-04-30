@@ -268,7 +268,7 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	return si, nil
 }
 
-// Delete removes the session from the map, collects teardown observability data, and
+// Delete collects teardown observability data, removes the session from the map, and
 // cancels the session context (sending SIGKILL to Chromium).
 // Observability collection is controlled by two independent flags:
 //
@@ -278,46 +278,26 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 //   - EnableCDPMetrics: enumerates page targets via /json/list and calls
 //     Performance.getMetrics on each renderer. Adds up to 300ms to DELETE.
 //
-// Concurrency: takeSession atomically removes the session from the map AND cancels its
-// context under the same lock. A concurrent Create either sees the session in the map
-// (and kills it via killExisting) or sees it gone with SIGKILL already in flight.
-// Observability collection happens after cancel. SIGKILL is non-blocking so Chromium and
-// its subprocesses remain present in /proc and cgroup.procs for a brief window after the
-// signal is sent. emitTeardownObservability treats ENOENT as an expected race and skips.
+// Concurrency: Delete holds the session mutex until observability collection completes
+// and the session context is cancelled. A concurrent Create either sees the session in
+// the map (and kills it via killExisting) or waits until teardown has completed.
 func (s *Supervisor) Delete(sessionID string) bool {
-	sess, found := s.takeSession(sessionID)
-	if !found {
-		return false
-	}
-
-	s.emitTeardownObservability(sess)
-
-	return true
-}
-
-// takeSession atomically removes the session from the map, cancels its context (sending
-// SIGKILL to Chromium), and returns the session. Both operations happen under the same
-// lock so no caller can observe the session gone from the map without SIGKILL already
-// having been sent. Returns (session{}, false) if no session with that ID exists.
-func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
 	sess, found := s.sessions[sessionID]
 	if !found {
-		return session{}, false
+		return false
 	}
 
-	delete(s.sessions, sessionID)
-	sess.cancel()
+	s.emitTeardownObservability(sess)
+	s.delete(sessionID)
 
-	return sess, true
+	return true
 }
 
 // emitTeardownObservability collects and emits process and renderer metrics for the session.
-// Called after takeSession (SIGKILL already sent). SIGKILL is non-blocking so the process
-// tree is still readable for a brief window; ENOENT is treated as the process having
-// already exited and is skipped silently.
+// Called before cancelling the session so CDP remains available while renderer metrics are collected.
 // All collection is best-effort; errors are logged at Debug and do not affect teardown.
 func (s *Supervisor) emitTeardownObservability(sess session) {
 	var (
@@ -352,9 +332,8 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 		return
 	}
 
-	// context.Background() is intentional: the session context is already cancelled
-	// (sess.cancel was called in takeSession) and some slog handler implementations
-	// suppress output when the provided context is done.
+	// context.Background() is intentional: teardown logging should not be suppressed
+	// if the session context was already cancelled by a timeout.
 	for _, p := range processes {
 		sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium process memory",
 			slog.Int("pid", p.PID),
