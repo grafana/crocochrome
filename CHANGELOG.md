@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/grafana/crocochrome/compare/v0.10.3...v0.11.0) (2026-05-01)
+
+
+### Features
+
+* Chromium memory observability via kernel accounting ([#446](https://github.com/grafana/crocochrome/issues/446)) ([bdf3a5c](https://github.com/grafana/crocochrome/commit/bdf3a5ce27011617e9e298fe3e14d719a6b522a1))
+
 ## [0.10.3](https://github.com/grafana/crocochrome/compare/v0.10.2...v0.10.3) (2026-04-24)
 
 
