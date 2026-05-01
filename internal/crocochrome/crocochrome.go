@@ -65,6 +65,21 @@ type Options struct {
 	// ExtraUATerms is appended, after a space, to the chromium user agent. It can be used to add vendor-specific
 	// information to it, such as the name of the product using chromium to perform requests.
 	ExtraUATerms string
+	// CgroupMemoryEventsPath is the path to the cgroup memory events file used to detect OOM kills.
+	// If empty, the path is auto-detected (cgroupsv2: /sys/fs/cgroup/memory.events,
+	// cgroupsv1: /sys/fs/cgroup/memory/<hierarchy>/memory.oom_control).
+	// Set to a non-existent path to disable OOM detection (e.g. in tests that do not need it).
+	CgroupMemoryEventsPath string
+	// EnableProcessMetrics enables per-process RSS collection at session teardown.
+	// When true, Delete() walks cgroup.procs and reads VmRSS and VmHWM from
+	// /proc/<pid>/status for each process, emitting "chromium process memory" log entries
+	// and a "chromium session memory" summary with the cgroup-level total.
+	// This is fast (file reads only, no network) and adds negligible overhead to DELETE.
+	// Disabled by default; enable via the -process-metrics flag.
+	EnableProcessMetrics bool
+	// ProcFSRoot is the root of the proc filesystem used for per-process RSS and cmdline reads.
+	// Defaults to "/proc". Override in tests to point at a temp directory.
+	ProcFSRoot string
 }
 
 const (
@@ -96,6 +111,14 @@ func (o Options) withDefaults() Options {
 		o.Registry = prometheus.NewRegistry() // Empty, unused.
 	}
 
+	if o.ProcFSRoot == "" {
+		o.ProcFSRoot = "/proc"
+	}
+
+	if o.CgroupMemoryEventsPath == "" {
+		o.CgroupMemoryEventsPath = detectCgroupMemoryEventsPath(o.ProcFSRoot)
+	}
+
 	return o
 }
 
@@ -118,6 +141,9 @@ type session struct {
 	info *SessionInfo
 	// cancel is the CancelFunc for this session, called on Delete and when the session times out.
 	cancel context.CancelFunc
+	// logger is the session-scoped logger enriched with sessionID, regionID, tenantID, and check id.
+	// Constructed in Create and used in goroutines that outlive it (e.g. Delete).
+	logger *slog.Logger
 }
 
 func New(logger *slog.Logger, opts Options) *Supervisor {
@@ -194,12 +220,12 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 		// session has already been removed.
 		logger.Debug("context cancelled, removing session from the map")
 		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
-		s.wg.Done()
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
 	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
 	go func() {
+		defer s.wg.Done()
 		err := s.launch(ctx, logger)
 		if err != nil {
 			logger.Error("launching chromium", "err", err)
@@ -226,17 +252,88 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	s.sessions[id] = session{
 		cancel: cancel,
 		info:   &si,
+		logger: logger,
 	}
 
 	return si, nil
 }
 
-// Delete cancels a session's context and removes it from the map.
+// Delete collects teardown observability data and cancels the session context (sending
+// SIGKILL to Chromium).
+//
+// Concurrency: takeSession atomically removes the session from the map AND cancels its
+// context under the same lock. This eliminates the race window where a concurrent Create
+// could find an empty map (no session to kill) and attempt to start a new Chromium on
+// the same port while the old one was still alive. Any concurrent caller sees either the
+// session in the map (and kills it via killExisting) or the session gone with SIGKILL
+// already in flight. No intermediate state is observable.
+//
+// Observability collection happens after cancel. SIGKILL is non-blocking: the kernel
+// schedules process cleanup but does not wait for it, so Chromium and its subprocesses
+// remain present in /proc and cgroup.procs for a brief window after the signal is sent.
+// emitTeardownObservability reads during this window and treats ENOENT (process exited
+// before read) as an expected race, skipping silently.
 func (s *Supervisor) Delete(sessionID string) bool {
+	sess, found := s.takeSession(sessionID)
+	if !found {
+		return false
+	}
+
+	s.emitTeardownObservability(sess)
+
+	return true
+}
+
+// takeSession atomically removes the session from the map, cancels its context (sending
+// SIGKILL to Chromium), and returns the session. Both operations happen under the same
+// lock so no caller can observe the session gone from the map without SIGKILL already
+// having been sent. Returns (session{}, false) if no session with that ID exists.
+func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
-	return s.delete(sessionID)
+	sess, found := s.sessions[sessionID]
+	if !found {
+		return session{}, false
+	}
+
+	delete(s.sessions, sessionID)
+	sess.cancel()
+
+	return sess, true
+}
+
+// emitTeardownObservability collects and emits process metrics for the given session.
+// Called after takeSession (SIGKILL already sent) so the window in which process data is
+// readable is brief. ENOENT on any /proc read is treated as the process having already
+// exited and is skipped silently.
+// All collection is best-effort; errors are logged at Debug and do not affect teardown.
+func (s *Supervisor) emitTeardownObservability(sess session) {
+	if !s.opts.EnableProcessMetrics {
+		return
+	}
+
+	processes, cgroupRSS, procErr := collectProcessMetrics(s.opts.CgroupMemoryEventsPath, s.opts.ProcFSRoot)
+	if procErr != nil {
+		sess.logger.Debug("could not collect process metrics", "err", procErr)
+	}
+
+	// context.Background() is intentional: the session context is already cancelled
+	// (sess.cancel was called in takeSession) and some slog handler implementations
+	// suppress output when the provided context is done.
+	for _, p := range processes {
+		sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium process memory",
+			slog.Int("pid", p.PID),
+			slog.String("processType", p.Type),
+			slog.Int64("rss", p.RSS),
+			slog.Int64("peakRSS", p.PeakRSS),
+		)
+	}
+
+	sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
+		slog.Int64("cgroupRSS", cgroupRSS),
+		slog.Int("processCount", len(processes)),
+	)
 }
 
 // Wait blocks until there are no sessions running.
@@ -342,7 +439,30 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
 
+	// Sample the cgroup OOM kill counter before launching Chromium so we can detect
+	// any OOM kills that occur during this session (as opposed to prior sessions).
+	oomBefore, oomBeforeErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath)
+	if oomBeforeErr != nil {
+		logger.Warn("could not read cgroup OOM kill count before session", "err", oomBeforeErr)
+	}
+
 	err = cmd.Run()
+
+	// Check whether the OOM killer fired during this session. Skip the comparison if the
+	// baseline read failed — incrementing against an unknown baseline (implicitly 0) would
+	// produce false positives. Also guard against counter wraparound/reset which would
+	// manifest as oomAfter < oomBefore.
+	if oomBeforeErr == nil {
+		if oomAfter, oomErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath); oomErr != nil {
+			logger.Warn("could not read cgroup OOM kill count after session", "err", oomErr)
+		} else if oomAfter < oomBefore {
+			logger.Warn("cgroup OOM kill counter decreased unexpectedly (counter reset or cgroup recreated?)",
+				"before", oomBefore, "after", oomAfter)
+		} else if delta := oomAfter - oomBefore; delta > 0 {
+			logger.Warn("OOM kill(s) detected during session", "oomKills", delta)
+			s.metrics.OOMKills.Add(float64(delta))
+		}
+	}
 
 	attrs := make([]slog.Attr, 0, 9)
 
