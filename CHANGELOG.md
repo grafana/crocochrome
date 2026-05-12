@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.1](https://github.com/grafana/crocochrome/compare/v0.11.0...v0.11.1) (2026-05-11)
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/get-vault-secrets action to v1.3.2 ([#450](https://github.com/grafana/crocochrome/issues/450)) ([d3e6c6f](https://github.com/grafana/crocochrome/commit/d3e6c6f733049276a25cf55bfc3baaade73ea349))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.37.1 ([#448](https://github.com/grafana/crocochrome/issues/448)) ([29e5dcc](https://github.com/grafana/crocochrome/commit/29e5dcc9ef8b4820ee3a1233e7e7e39c6a63931c))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.38.0 ([#453](https://github.com/grafana/crocochrome/issues/453)) ([d1904bb](https://github.com/grafana/crocochrome/commit/d1904bbf40d6b5ad2fd375ae0a62555ac8da1844))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.38.1 ([#455](https://github.com/grafana/crocochrome/issues/455)) ([6d7e5ad](https://github.com/grafana/crocochrome/commit/6d7e5ad8307b73d6fba520479decd27b98b352c5))
+* Update googleapis/release-please-action action to v5 ([#445](https://github.com/grafana/crocochrome/issues/445)) ([199e070](https://github.com/grafana/crocochrome/commit/199e0700631cd0bba8b6519848946dea99a2f21e))
+
 ## [0.11.0](https://github.com/grafana/crocochrome/compare/v0.10.3...v0.11.0) (2026-05-01)
 
 
