@@ -29,6 +29,20 @@
         "ghcr.io/grafana/chromium-swiftshader-alpine"
       ],
       "versioning": "loose"
+    },
+    {
+      "matchPackageNames": [
+        "grafana/k6"
+      ],
+      "matchCurrentVersion": ">=1.0.0 <2.0.0",
+      "allowedVersions": "<2.0.0"
+    },
+    {
+      "matchPackageNames": [
+        "grafana/k6"
+      ],
+      "matchCurrentVersion": ">=2.0.0 <3.0.0",
+      "allowedVersions": "<3.0.0"
     }
   ]
 }
