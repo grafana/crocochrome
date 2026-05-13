@@ -32,7 +32,7 @@ func TestIntegration(t *testing.T) {
 		t.Skipf("Skipping integration test due to -short")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	image, err := buildImage("..", "crocochrome")
