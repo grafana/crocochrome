@@ -71,73 +71,79 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("getting crocochrome endpoint: %v", err)
 	}
 
-	// Create a k6 container to run the scripts from.
-	k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		Started: true,
-		ContainerRequest: testcontainers.ContainerRequest{
-			// Renovate updates the version below. Keep its format as it is or update the renovate config with it.
-			Image:      "grafana/k6:1.7.1",
-			Entrypoint: []string{"/bin/sleep", "infinity"},
-			Networks:   []string{network.Name},
-		},
-	})
-	testcontainers.CleanupContainer(t, k6)
-	if err != nil {
-		t.Fatalf("starting k6 container: %v", err)
-	}
-
-	for _, tc := range []struct {
-		name   string
-		script string
-	}{
-		{
-			name:   "simple browser test",
-			script: scriptk6io,
-		},
+	// Test crocochrome in combination with both active k6 versions, v1 and v2.
+	for _, k6Version := range []string{
+		// Renovate updates the versions below.
+		// Keep the format as it is or update the renovate config with it.
+		"grafana/k6:1.7.1",
+		"grafana/k6:2.0.0",
 	} {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			// Crocochrome can only run one session at a time. Do not run in parallel.
-			session, err := createSession(endpoint)
-			if err != nil {
-				t.Fatalf("creating session: %v", err)
-			}
-
-			t.Cleanup(func() {
-				err := deleteSession(endpoint, session.ID)
-				if err != nil {
-					t.Fatalf("deleting session: %v", err)
-				}
+		t.Run(k6Version, func(t *testing.T) {
+			k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+				Started: true,
+				ContainerRequest: testcontainers.ContainerRequest{
+					Image:      k6Version,
+					Entrypoint: []string{"/bin/sleep", "infinity"},
+					Networks:   []string{network.Name},
+				},
 			})
-
-			// TODO: Would be NEAT if we could just use stdin. However testcontainers does not seem to support that.
-			scriptPath := filepath.Join("/", "home", "k6", strings.ReplaceAll(t.Name(), "/", "_")+".js")
-			err = k6.CopyToContainer(ctx, []byte(tc.script), scriptPath, 0o644)
+			testcontainers.CleanupContainer(t, k6)
 			if err != nil {
-				t.Fatalf("copying k6 script to container: %v", err)
+				t.Fatalf("starting k6 container: %v", err)
 			}
 
-			rc, stdouterr, err := k6.Exec(
-				ctx,
-				[]string{"k6", "run", scriptPath},
-				exec.Multiplexed(),
-				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + ccName + ":8080/proxy/" + session.ID}),
-			)
-			if err != nil {
-				t.Fatalf("running k6 script: %v", err)
-			}
+			for _, tc := range []struct {
+				name   string
+				script string
+			}{
+				{
+					name:   "simple browser test",
+					script: scriptk6io,
+				},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					// Crocochrome can only run one session at a time. Do not run in parallel.
+					session, err := createSession(endpoint)
+					if err != nil {
+						t.Fatalf("creating session: %v", err)
+					}
 
-			output, _ := io.ReadAll(stdouterr)
-			t.Logf("k6 output:\n%s", string(output))
+					t.Cleanup(func() {
+						err := deleteSession(endpoint, session.ID)
+						if err != nil {
+							t.Fatalf("deleting session: %v", err)
+						}
+					})
 
-			// Usual k6 hack: k6 will exit with 0 even if fatal errors occur.
-			if bytes.Contains(output, []byte("error")) {
-				t.Fatalf("k6 output contains the string \"error\"")
-			}
+					// TODO: Would be NEAT if we could just use stdin. However testcontainers does not seem to support that.
+					scriptPath := filepath.Join("/", "home", "k6", strings.ReplaceAll(t.Name(), "/", "_")+".js")
+					err = k6.CopyToContainer(ctx, []byte(tc.script), scriptPath, 0o644)
+					if err != nil {
+						t.Fatalf("copying k6 script to container: %v", err)
+					}
 
-			if rc != 0 {
-				t.Fatalf("unexpected k6 return code %d", rc)
+					rc, stdouterr, err := k6.Exec(
+						ctx,
+						[]string{"k6", "run", scriptPath},
+						exec.Multiplexed(),
+						exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + ccName + ":8080/proxy/" + session.ID}),
+					)
+					if err != nil {
+						t.Fatalf("running k6 script: %v", err)
+					}
+
+					output, _ := io.ReadAll(stdouterr)
+					t.Logf("k6 output:\n%s", string(output))
+
+					// Usual k6 hack: k6 will exit with 0 even if fatal errors occur.
+					if bytes.Contains(output, []byte("error")) {
+						t.Fatalf("k6 output contains the string \"error\"")
+					}
+
+					if rc != 0 {
+						t.Fatalf("unexpected k6 return code %d", rc)
+					}
+				})
 			}
 		})
 	}
