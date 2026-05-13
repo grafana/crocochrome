@@ -23,6 +23,13 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	// Renovate updates the images below.
+	// Keep the format as it is or update the renovate config with it.
+	k6V1ImageVersion = "grafana/k6:1.7.1"
+	k6V2ImageVersion = "grafana/k6:2.0.0"
+)
+
 // TestIntegration performs integration tests by spinning up a production-ish container and try to run k6 against it,
 // implementing a client to crocochrome and using the official k6 image to run the test.
 func TestIntegration(t *testing.T) {
@@ -32,7 +39,7 @@ func TestIntegration(t *testing.T) {
 		t.Skipf("Skipping integration test due to -short")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	image, err := buildImage("..", "crocochrome")
@@ -71,33 +78,28 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("getting crocochrome endpoint: %v", err)
 	}
 
-	// Create a k6 container to run the scripts from.
-	k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		Started: true,
-		ContainerRequest: testcontainers.ContainerRequest{
-			// Renovate updates the version below. Keep its format as it is or update the renovate config with it.
-			Image:      "grafana/k6:1.7.1",
-			Entrypoint: []string{"/bin/sleep", "infinity"},
-			Networks:   []string{network.Name},
-		},
-	})
-	testcontainers.CleanupContainer(t, cc)
-	if err != nil {
-		t.Fatalf("starting k6 container: %v", err)
-	}
-
 	for _, tc := range []struct {
 		name   string
+		image  string
 		script string
 	}{
-		{
-			name:   "simple browser test",
-			script: scriptk6io,
-		},
+		{"k6-v1/simple browser test", k6V1ImageVersion, scriptk6io},
+		{"k6-v2/simple browser test", k6V2ImageVersion, scriptk6io},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
+			k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+				Started: true,
+				ContainerRequest: testcontainers.ContainerRequest{
+					Image:      tc.image,
+					Entrypoint: []string{"/bin/sleep", "infinity"},
+					Networks:   []string{network.Name},
+				},
+			})
+			testcontainers.CleanupContainer(t, k6)
+			if err != nil {
+				t.Fatalf("starting k6 container: %v", err)
+			}
+
 			// Crocochrome can only run one session at a time. Do not run in parallel.
 			session, err := createSession(endpoint)
 			if err != nil {
