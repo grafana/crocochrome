@@ -23,6 +23,13 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	// Renovate updates the images below.
+	// Keep the format as it is or update the renovate config with it.
+	k6V1ImageVersion = "grafana/k6:1.7.1"
+	k6V2ImageVersion = "grafana/k6:2.0.0"
+)
+
 // TestIntegration performs integration tests by spinning up a production-ish container and try to run k6 against it,
 // implementing a client to crocochrome and using the official k6 image to run the test.
 func TestIntegration(t *testing.T) {
@@ -71,18 +78,19 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("getting crocochrome endpoint: %v", err)
 	}
 
-	// Test crocochrome in combination with both active k6 versions, v1 and v2.
-	for _, k6Version := range []string{
-		// Renovate updates the versions below.
-		// Keep the format as it is or update the renovate config with it.
-		"grafana/k6:1.7.1",
-		"grafana/k6:2.0.0",
+	for _, tc := range []struct {
+		name   string
+		image  string
+		script string
+	}{
+		{"k6-v1/simple browser test", k6V1ImageVersion, scriptk6io},
+		{"k6-v2/simple browser test", k6V2ImageVersion, scriptk6io},
 	} {
-		t.Run(k6Version, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 				Started: true,
 				ContainerRequest: testcontainers.ContainerRequest{
-					Image:      k6Version,
+					Image:      tc.image,
 					Entrypoint: []string{"/bin/sleep", "infinity"},
 					Networks:   []string{network.Name},
 				},
@@ -92,58 +100,46 @@ func TestIntegration(t *testing.T) {
 				t.Fatalf("starting k6 container: %v", err)
 			}
 
-			for _, tc := range []struct {
-				name   string
-				script string
-			}{
-				{
-					name:   "simple browser test",
-					script: scriptk6io,
-				},
-			} {
-				t.Run(tc.name, func(t *testing.T) {
-					// Crocochrome can only run one session at a time. Do not run in parallel.
-					session, err := createSession(endpoint)
-					if err != nil {
-						t.Fatalf("creating session: %v", err)
-					}
+			// Crocochrome can only run one session at a time. Do not run in parallel.
+			session, err := createSession(endpoint)
+			if err != nil {
+				t.Fatalf("creating session: %v", err)
+			}
 
-					t.Cleanup(func() {
-						err := deleteSession(endpoint, session.ID)
-						if err != nil {
-							t.Fatalf("deleting session: %v", err)
-						}
-					})
+			t.Cleanup(func() {
+				err := deleteSession(endpoint, session.ID)
+				if err != nil {
+					t.Fatalf("deleting session: %v", err)
+				}
+			})
 
-					// TODO: Would be NEAT if we could just use stdin. However testcontainers does not seem to support that.
-					scriptPath := filepath.Join("/", "home", "k6", strings.ReplaceAll(t.Name(), "/", "_")+".js")
-					err = k6.CopyToContainer(ctx, []byte(tc.script), scriptPath, 0o644)
-					if err != nil {
-						t.Fatalf("copying k6 script to container: %v", err)
-					}
+			// TODO: Would be NEAT if we could just use stdin. However testcontainers does not seem to support that.
+			scriptPath := filepath.Join("/", "home", "k6", strings.ReplaceAll(t.Name(), "/", "_")+".js")
+			err = k6.CopyToContainer(ctx, []byte(tc.script), scriptPath, 0o644)
+			if err != nil {
+				t.Fatalf("copying k6 script to container: %v", err)
+			}
 
-					rc, stdouterr, err := k6.Exec(
-						ctx,
-						[]string{"k6", "run", scriptPath},
-						exec.Multiplexed(),
-						exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + ccName + ":8080/proxy/" + session.ID}),
-					)
-					if err != nil {
-						t.Fatalf("running k6 script: %v", err)
-					}
+			rc, stdouterr, err := k6.Exec(
+				ctx,
+				[]string{"k6", "run", scriptPath},
+				exec.Multiplexed(),
+				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + ccName + ":8080/proxy/" + session.ID}),
+			)
+			if err != nil {
+				t.Fatalf("running k6 script: %v", err)
+			}
 
-					output, _ := io.ReadAll(stdouterr)
-					t.Logf("k6 output:\n%s", string(output))
+			output, _ := io.ReadAll(stdouterr)
+			t.Logf("k6 output:\n%s", string(output))
 
-					// Usual k6 hack: k6 will exit with 0 even if fatal errors occur.
-					if bytes.Contains(output, []byte("error")) {
-						t.Fatalf("k6 output contains the string \"error\"")
-					}
+			// Usual k6 hack: k6 will exit with 0 even if fatal errors occur.
+			if bytes.Contains(output, []byte("error")) {
+				t.Fatalf("k6 output contains the string \"error\"")
+			}
 
-					if rc != 0 {
-						t.Fatalf("unexpected k6 return code %d", rc)
-					}
-				})
+			if rc != 0 {
+				t.Fatalf("unexpected k6 return code %d", rc)
 			}
 		})
 	}
