@@ -81,7 +81,7 @@ func TestIntegration(t *testing.T) {
 			Networks:   []string{network.Name},
 		},
 	})
-	testcontainers.CleanupContainer(t, cc)
+	testcontainers.CleanupContainer(t, k6)
 	if err != nil {
 		t.Fatalf("starting k6 container: %v", err)
 	}
