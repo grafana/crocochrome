@@ -9,7 +9,6 @@ policy:
     - or:
         - and:
             - Workflow .github/workflows/push-pr.yaml succeeded or skipped
-            - Workflow .github/workflows/renovate-approve.yaml succeeded or skipped
             - Workflow .github/workflows/renovate-validate.yaml succeeded or skipped
             - Workflow .github/workflows/validate-policy-bot-config.yml succeeded or skipped
             - default to approval
@@ -31,19 +30,6 @@ approval_rules:
             - success
           workflows:
             - .github/workflows/push-pr.yaml
-  - name: Workflow .github/workflows/renovate-approve.yaml succeeded or skipped
-    if:
-      file_not_deleted:
-        paths:
-          - ^\.github\/workflows\/renovate-approve\.yaml$
-    requires:
-      conditions:
-        has_workflow_result:
-          conclusions:
-            - skipped
-            - success
-          workflows:
-            - .github/workflows/renovate-approve.yaml
   - name: Workflow .github/workflows/renovate-validate.yaml succeeded or skipped
     if:
       changed_files:
