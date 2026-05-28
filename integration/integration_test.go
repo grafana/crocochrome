@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/grafana/crocochrome/internal/crocochrome"
+	"github.com/moby/moby/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -92,7 +93,9 @@ func TestIntegration(t *testing.T) {
 				ContainerRequest: testcontainers.ContainerRequest{
 					Image:      tc.image,
 					Entrypoint: []string{"/bin/sleep", "infinity"},
-					Networks:   []string{network.Name},
+					HostConfigModifier: func(hc *container.HostConfig) {
+						hc.NetworkMode = container.NetworkMode("container:" + cc.GetContainerID())
+					},
 				},
 			})
 			testcontainers.CleanupContainer(t, k6)
@@ -124,7 +127,7 @@ func TestIntegration(t *testing.T) {
 				ctx,
 				[]string{"k6", "run", scriptPath},
 				exec.Multiplexed(),
-				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + ccName + ":8080/proxy/" + session.ID}),
+				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://localhost:8080/proxy/" + session.ID}),
 			)
 			if err != nil {
 				t.Fatalf("running k6 script: %v", err)
