@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.12.0](https://github.com/grafana/crocochrome/compare/v0.11.1...v0.12.0) (2026-05-30)
+
+
+### Features
+
+* Support k6 v2 in integration tests ([#457](https://github.com/grafana/crocochrome/issues/457)) ([04d753f](https://github.com/grafana/crocochrome/commit/04d753f50b4c61e527fbdb60f090d3532a50c5a1))
+
+
+### Fixes
+
+* Migrate workflows to NOT use get-vault-secrets ([592fae0](https://github.com/grafana/crocochrome/commit/592fae0904959f86ab51fa7a6ffa75d640504e01))
+* **release-please:** Add id-token to permissions ([#464](https://github.com/grafana/crocochrome/issues/464)) ([17cd106](https://github.com/grafana/crocochrome/commit/17cd1065c7c2bd89dd0db81446087d60583a0ee1))
+* Remove renovate-approver workflow ([#462](https://github.com/grafana/crocochrome/issues/462)) ([76167a8](https://github.com/grafana/crocochrome/commit/76167a87c129e9c81ffe16deea10dfb1fc727a74))
+* Update manifest-file name ([#465](https://github.com/grafana/crocochrome/issues/465)) ([9c9ab9b](https://github.com/grafana/crocochrome/commit/9c9ab9bc7c0c8cce6af95886034e3a2fba04687c))
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/create-github-app-token action to v0.2.3 ([954e06c](https://github.com/grafana/crocochrome/commit/954e06c730cd86c7069f55fecf68d23ae5d2666a))
+* **deps:** update grafana/shared-workflows/validate-renovate-config action to v0.1.3 ([b2d4c29](https://github.com/grafana/crocochrome/commit/b2d4c29ebc49396e06a92e23a64fe68f72750fa4))
+* Update actions/create-github-app-token digest to bcd2ba4 ([ef6d3c3](https://github.com/grafana/crocochrome/commit/ef6d3c3999298ffe0fdc7edb57cd002a3bde6235))
+* Update docker/build-push-action digest to f9f3042 ([255908d](https://github.com/grafana/crocochrome/commit/255908d8ab33b761d587e920c52a292d3a40c042))
+* Update docker/login-action digest to 650006c ([98864c4](https://github.com/grafana/crocochrome/commit/98864c4459ce37c90e3fbc4e00a4d6564a953325))
+* Update docker/setup-buildx-action digest to d7f5e7f ([612f4a7](https://github.com/grafana/crocochrome/commit/612f4a7cae28750770d75949badff00ee67d0794))
+* Update docker/setup-qemu-action digest to 0611638 ([160112e](https://github.com/grafana/crocochrome/commit/160112e17349f2589a164e2bda13442faea4fef1))
+* Update module github.com/prometheus/procfs to v0.20.1 ([27a4455](https://github.com/grafana/crocochrome/commit/27a4455455aa4c69c20cbe1d0493d7d6f2022b25))
+* Update module go.opentelemetry.io/otel/sdk to v1.43.0 ([#460](https://github.com/grafana/crocochrome/issues/460)) ([755ed03](https://github.com/grafana/crocochrome/commit/755ed031586d16beb4c5b14b66c28377cfff26c6))
+* Update module golang.org/x/crypto to v0.52.0 [SECURITY] ([#469](https://github.com/grafana/crocochrome/issues/469)) ([937161a](https://github.com/grafana/crocochrome/commit/937161ab00946e4695706089126c13bd9cb58ca0))
+
 ## [0.11.1](https://github.com/grafana/crocochrome/compare/v0.11.0...v0.11.1) (2026-05-11)
 
 
