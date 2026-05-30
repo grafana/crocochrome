@@ -208,6 +208,17 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.SessionTimeout)
 
+	// Sample the cgroup OOM kill counter before launching Chromium so we
+	// can detect any OOM kills that occur during this session (as opposed
+	// to prior sessions). This is done synchronously, before the launch
+	// goroutine starts, so the baseline is guaranteed to reflect the state
+	// at the moment Create is called rather than racing with the goroutine
+	// being scheduled.
+	oomBefore, oomBeforeErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath)
+	if oomBeforeErr != nil {
+		logger.Warn("could not read cgroup OOM kill count before session", "err", oomBeforeErr)
+	}
+
 	s.wg.Add(1)
 
 	// Register a function that removes the session from the map when the context is cancelled.
@@ -223,10 +234,12 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
-	// We do not wait for errors, as we probe chromium below. If something went wrong, we error out there.
+	//
+	// We do not wait for errors, as we probe chromium below. If something
+	// went wrong, we error out there.
 	go func() {
 		defer s.wg.Done()
-		err := s.launch(ctx, logger)
+		err := s.launch(ctx, logger, oomBefore, oomBeforeErr)
 		if err != nil {
 			logger.Error("launching chromium", "err", err)
 		}
@@ -363,9 +376,10 @@ func (s *Supervisor) killExisting() {
 	}
 }
 
-// launch prepares the requires directories and launches chromium, blocking until it exits. Cancelling the context kills
-// chromium. The sessionID is used only for logging.
-func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
+// launch prepares the requires directories and launches chromium, blocking
+// until it exits. Cancelling the context kills chromium. The sessionID is used
+// only for logging.
+func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger, oomBefore uint64, oomBeforeErr error) error {
 	logger.Debug("starting session")
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -438,13 +452,6 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger) error {
 	defer func() {
 		s.metrics.SessionDuration.Observe(time.Since(created).Seconds())
 	}()
-
-	// Sample the cgroup OOM kill counter before launching Chromium so we can detect
-	// any OOM kills that occur during this session (as opposed to prior sessions).
-	oomBefore, oomBeforeErr := readOOMKillCount(s.opts.CgroupMemoryEventsPath)
-	if oomBeforeErr != nil {
-		logger.Warn("could not read cgroup OOM kill count before session", "err", oomBeforeErr)
-	}
 
 	err = cmd.Run()
 
@@ -558,8 +565,11 @@ func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	logger := s.logger.With("sessionID", "compute-user-agent")
+	skipOOMSampling := errors.New("skip OOM sampling")
+
 	go func() {
-		err := s.launch(ctx, s.logger.With("sessionID", "compute-user-agent"))
+		err := s.launch(ctx, logger, 0, skipOOMSampling)
 		if err != nil {
 			s.logger.Error("launching chromium", "err", err)
 		}
