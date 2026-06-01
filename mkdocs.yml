@@ -13,3 +13,19 @@ theme:
 
 plugins:
   - techdocs-core
+
+nav:
+  - Architecture:
+      - Overview: index.md
+      - Entry point & lifecycle: architecture/entrypoint-and-lifecycle.md
+      - HTTP API & WebSocket proxy: architecture/http-api.md
+      - Supervisor: architecture/supervisor.md
+      - Chromium client: architecture/chromium-client.md
+      - Observability: architecture/observability.md
+      - Build, container & CI: architecture/build-and-packaging.md
+      - Security model: architecture/security.md
+      - Testing strategy: architecture/testing.md
+  - Reference:
+      - Linux capabilities: capabilities.md
+      - Chromium sandboxing: chromium-sandbox.md
+      - Chromium observability: chromium-observability.md
