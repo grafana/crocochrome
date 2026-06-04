@@ -13,13 +13,26 @@
   "customManagers": [
     {
       "customType": "regex",
-      "depNameTemplate": "grafana/k6",
+      "depNameTemplate": "grafana/k6-v1",
+      "packageNameTemplate": "grafana/k6",
       "datasourceTemplate": "docker",
       "managerFilePatterns": [
         "**/*_test.go"
       ],
       "matchStrings": [
-        "grafana/k6:(?<currentValue>[\\w.-]+)"
+        "k6V1ImageVersion\\s*=\\s*\"grafana/k6:(?<currentValue>[\\w.-]+)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "depNameTemplate": "grafana/k6-v2",
+      "packageNameTemplate": "grafana/k6",
+      "datasourceTemplate": "docker",
+      "managerFilePatterns": [
+        "**/*_test.go"
+      ],
+      "matchStrings": [
+        "k6V2ImageVersion\\s*=\\s*\"grafana/k6:(?<currentValue>[\\w.-]+)\""
       ]
     }
   ],
@@ -32,14 +45,14 @@
     },
     {
       "matchPackageNames": [
-        "grafana/k6"
+        "grafana/k6-v1"
       ],
       "matchCurrentVersion": ">=1.0.0 <2.0.0",
       "allowedVersions": "<2.0.0"
     },
     {
       "matchPackageNames": [
-        "grafana/k6"
+        "grafana/k6-v2"
       ],
       "matchCurrentVersion": ">=2.0.0 <3.0.0",
       "allowedVersions": "<3.0.0"
