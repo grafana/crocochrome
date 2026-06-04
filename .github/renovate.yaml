@@ -11,14 +11,25 @@ ignorePresets:
   - github>grafana/grafana-renovate-config//presets/automerge
 
 customManagers:
-  - # Update k6 image used for integration tests only.
+  - # Update k6 v1 image used for integration tests only.
     customType: regex
-    depNameTemplate: grafana/k6
+    depNameTemplate: grafana/k6-v1
+    packageNameTemplate: grafana/k6
     datasourceTemplate: docker
     managerFilePatterns:
       - '**/*_test.go'
     matchStrings:
-      - grafana/k6:(?<currentValue>[\w.-]+)
+      - 'k6V1ImageVersion\s*=\s*"grafana/k6:(?<currentValue>[\w.-]+)"'
+
+  - # Update k6 v2 image used for integration tests only.
+    customType: regex
+    depNameTemplate: grafana/k6-v2
+    packageNameTemplate: grafana/k6
+    datasourceTemplate: docker
+    managerFilePatterns:
+      - '**/*_test.go'
+    matchStrings:
+      - 'k6V2ImageVersion\s*=\s*"grafana/k6:(?<currentValue>[\w.-]+)"'
 
 packageRules:
   - # The default "docker" versioning will try to restrict upgrades to versions
@@ -34,11 +45,11 @@ packageRules:
     versioning: loose
 
   - matchPackageNames:
-      - grafana/k6
+      - grafana/k6-v1
     matchCurrentVersion: '>=1.0.0 <2.0.0'
     allowedVersions: '<2.0.0'
 
   - matchPackageNames:
-      - grafana/k6
+      - grafana/k6-v2
     matchCurrentVersion: '>=2.0.0 <3.0.0'
     allowedVersions: '<3.0.0'
