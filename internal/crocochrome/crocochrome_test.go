@@ -209,17 +209,16 @@ func TestCrocochrome(t *testing.T) {
 		var buf bytes.Buffer
 		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-		hb := testutil.NewHeartbeat(t)
-		cdpURL := testutil.CDPServer(t)
-
-		// Two fake page targets pointing to the same CDP server.
-		// StartChromiumWithTargets wires /json/version and /json/list on the same server,
-		// matching real Chromium's behaviour so chromiumTargets() resolves /json/list correctly.
-		targets := []testutil.CDPTargetInfo{
-			{URL: "https://example.com", WebSocketDebuggerURL: cdpURL},
-			{URL: "https://other.com", WebSocketDebuggerURL: cdpURL},
+		// Launch the test binary itself as a fake Chromium (see fakechromium_test.go) so its
+		// /json/list and CDP endpoints live inside the very process the supervisor SIGKILLs on
+		// cancel. This binds the CDP endpoints to the session lifecycle: the test passes only
+		// if collection runs while Chromium is alive (before cancel). A regression that moves
+		// collection after cancel hits a dead port and fails the renderer assertions below.
+		exe, err := os.Executable()
+		if err != nil {
+			t.Fatalf("locating test executable: %v", err)
 		}
-		port := testutil.StartChromiumWithTargets(t, targets)
+		port := freeTCPPort(t)
 
 		// Set up a fake cgroup dir and proc dir so process metrics can be collected.
 		cgroupDir := t.TempDir()
@@ -243,7 +242,7 @@ func TestCrocochrome(t *testing.T) {
 		writeFile(procRoot+"/9001/status", "VmHWM:\t 250000 kB\nVmRSS:\t 200000 kB\n")
 
 		cc := crocochrome.New(logger, crocochrome.Options{
-			ChromiumPath:           hb.Path,
+			ChromiumPath:           exe,
 			ChromiumPort:           port,
 			EnableProcessMetrics:   true,
 			EnableCDPMetrics:       true,
@@ -289,12 +288,22 @@ func TestCrocochrome(t *testing.T) {
 			}
 		}
 
-		// Summary entry must appear with the cgroup total.
+		// Process summary entry must appear with the cgroup total. rendererCount lives on its
+		// own CDP-gated line (see below), not here.
 		for _, want := range []string{
 			"chromium session memory",
 			"cgroupRSS=314572800",
-			"rendererCount=2",
 			"processCount=1",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+
+		// CDP renderer summary is gated independently of process metrics.
+		for _, want := range []string{
+			"chromium renderer summary",
+			"rendererCount=2",
 		} {
 			if !strings.Contains(logs, want) {
 				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
@@ -345,8 +354,8 @@ func TestCrocochrome(t *testing.T) {
 			t.Fatal("expected sm_crocochrome_chromium_oom_kills_total to be present in registry")
 		}
 
-		// Collect the counter value via GatherAndCount is only a presence check.
-		// Use CollectAndCompare for the actual value.
+		// GatherAndCount above only confirms the metric is present; GatherAndCompare verifies
+		// the actual counter value.
 		const wantMetric = `# HELP sm_crocochrome_chromium_oom_kills_total Total number of times the kernel OOM-killer fired within the container cgroup during a Chromium session. Incremented when the oom_kill counter in the cgroup memory events file increases between session start and session end.
 # TYPE sm_crocochrome_chromium_oom_kills_total counter
 sm_crocochrome_chromium_oom_kills_total 1

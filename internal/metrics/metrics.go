@@ -88,10 +88,12 @@ type SupervisorMetrics struct {
 	// tree (renderer, GPU process, etc.) exceeded the container memory limit and had one or more
 	// processes killed, even if crocochrome itself survived.
 	OOMKills prometheus.Counter
-	// CDPCollectionDuration records the wall-clock time spent on the CDP Performance.getMetrics
-	// call in Delete(). Observed on every attempt — including failed dials (which cluster near
-	// the 300ms timeout) — so the distribution is expected to be bimodal: <10ms when Chromium is
-	// alive, ≈300ms when the session has already timed out and Chromium is dead.
+	// CDPCollectionDuration records the wall-clock time spent on the CDP collection window in
+	// Delete(): the /json/list enumeration plus the per-renderer Performance.getMetrics
+	// round-trips. It does not include the process RSS walk. Collection runs while Chromium is
+	// still alive (before SIGKILL), so observations normally sit well below the 300ms ceiling
+	// (typically <50ms, scaling with renderer count); values near 300ms mean a renderer stopped
+	// responding and hit the timeout.
 	// Only populated when the -cdp-metrics flag is enabled; zero observations otherwise.
 	CDPCollectionDuration prometheus.Histogram
 }

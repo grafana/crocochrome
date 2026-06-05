@@ -279,7 +279,7 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	return si, nil
 }
 
-// Delete removes the session from the map, collects teardown observability data, and
+// Delete collects teardown observability data, removes the session from the map, and
 // cancels the session context (sending SIGKILL to Chromium).
 // Observability collection is controlled by two independent flags:
 //
@@ -289,19 +289,40 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 //   - EnableCDPMetrics: enumerates page targets via /json/list and calls
 //     Performance.getMetrics on each renderer. Adds up to 300ms to DELETE.
 //
+// Teardown ordering — the two collections sit on opposite sides of cancel() because they
+// have opposite timing requirements:
+//
+//   - CDP metrics need Chromium *alive*, so they are collected first, before takeSession
+//     cancels the context. This is best-effort: looking the session up without removing it
+//     is acceptable even under a concurrent Create/Delete race (worst case we collect
+//     metrics for a session that is about to be replaced).
+//   - Process/cgroup metrics rely on the brief post-SIGKILL window in which Chromium and
+//     its subprocesses remain present in /proc and cgroup.procs, so they are collected
+//     after cancel. ENOENT is treated as the process having already exited and skipped.
+//
 // Concurrency: takeSession atomically removes the session from the map AND cancels its
 // context under the same lock. A concurrent Create either sees the session in the map
-// (and kills it via killExisting) or sees it gone with SIGKILL already in flight.
-// Observability collection happens after cancel. SIGKILL is non-blocking so Chromium and
-// its subprocesses remain present in /proc and cgroup.procs for a brief window after the
-// signal is sent. emitTeardownObservability treats ENOENT as an expected race and skips.
+// (and kills it via killExisting) or sees it gone with SIGKILL already in flight. If
+// takeSession finds the session already gone (a concurrent Delete or the session timeout
+// won the race), that path owns teardown logging and we bail.
 func (s *Supervisor) Delete(sessionID string) bool {
-	sess, found := s.takeSession(sessionID)
+	sess, found := s.peekSession(sessionID)
 	if !found {
 		return false
 	}
 
-	s.emitTeardownObservability(sess)
+	// Collect CDP renderer metrics while Chromium is still alive, before takeSession sends
+	// SIGKILL. See the ordering note above.
+	var renderers []rendererMetrics
+	if s.opts.EnableCDPMetrics {
+		renderers = s.collectRendererMetrics(sess)
+	}
+
+	if _, found := s.takeSession(sessionID); !found {
+		return false
+	}
+
+	s.emitTeardownObservability(sess, renderers)
 
 	return true
 }
@@ -325,16 +346,47 @@ func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	return sess, true
 }
 
-// emitTeardownObservability collects and emits process and renderer metrics for the session.
+// peekSession returns the session with the given ID without removing it from the map or
+// cancelling its context. Used by Delete to collect CDP metrics while Chromium is still
+// alive. Returns (session{}, false) if no session with that ID exists.
+func (s *Supervisor) peekSession(sessionID string) (session, bool) {
+	s.sessionsMtx.Lock()
+	defer s.sessionsMtx.Unlock()
+
+	sess, found := s.sessions[sessionID]
+	return sess, found
+}
+
+// collectRendererMetrics gathers per-renderer CDP Performance metrics from the live Chromium
+// instance, bounded by cdpCollectTimeout. It must be called before the session context is
+// cancelled, while Chromium is still serving its debug endpoints. Best-effort: errors are
+// logged at Debug and yield a nil slice. Observes CDPCollectionDuration on every attempt.
+func (s *Supervisor) collectRendererMetrics(sess session) []rendererMetrics {
+	cdpStart := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), cdpCollectTimeout)
+	defer cancel()
+
+	renderers, err := cdpCollectRendererMetrics(ctx, sess.info.ChromiumVersion.WebSocketDebuggerURL)
+	if err != nil {
+		sess.logger.Debug("could not collect renderer CDP metrics", "err", err)
+	}
+	s.metrics.CDPCollectionDuration.Observe(time.Since(cdpStart).Seconds())
+
+	return renderers
+}
+
+// emitTeardownObservability collects process metrics and emits all teardown log entries.
 // Called after takeSession (SIGKILL already sent). SIGKILL is non-blocking so the process
 // tree is still readable for a brief window; ENOENT is treated as the process having
 // already exited and is skipped silently.
+//
+// renderers carries the CDP metrics collected by collectRendererMetrics *before* cancel,
+// while Chromium was still alive — see the ordering note on Delete.
 // All collection is best-effort; errors are logged at Debug and do not affect teardown.
-func (s *Supervisor) emitTeardownObservability(sess session) {
+func (s *Supervisor) emitTeardownObservability(sess session, renderers []rendererMetrics) {
 	var (
 		processes []processInfo
 		cgroupRSS int64
-		renderers []rendererMetrics
 	)
 
 	// Per-process RSS — fast file reads only, no context or timeout required.
@@ -344,19 +396,6 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 		if procErr != nil {
 			sess.logger.Debug("could not collect process metrics", "err", procErr)
 		}
-	}
-
-	// Per-renderer CDP metrics — bounded by a 300ms context deadline.
-	if s.opts.EnableCDPMetrics {
-		cdpStart := time.Now()
-		ctx, cancel := context.WithTimeout(context.Background(), cdpCollectTimeout)
-		var cdpErr error
-		renderers, cdpErr = cdpCollectRendererMetrics(ctx, sess.info.ChromiumVersion.WebSocketDebuggerURL)
-		cancel()
-		if cdpErr != nil {
-			sess.logger.Debug("could not collect renderer CDP metrics", "err", cdpErr)
-		}
-		s.metrics.CDPCollectionDuration.Observe(time.Since(cdpStart).Seconds())
 	}
 
 	if !s.opts.EnableProcessMetrics && !s.opts.EnableCDPMetrics {
@@ -383,8 +422,16 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 	if s.opts.EnableProcessMetrics {
 		sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium session memory",
 			slog.Int64("cgroupRSS", cgroupRSS),
-			slog.Int("rendererCount", len(renderers)),
 			slog.Int("processCount", len(processes)),
+		)
+	}
+
+	// rendererCount is a CDP concept, so it lives on its own CDP-gated line rather than the
+	// process-gated "chromium session memory" summary — otherwise it would be dropped when
+	// only -cdp-metrics is set.
+	if s.opts.EnableCDPMetrics {
+		sess.logger.LogAttrs(context.Background(), slog.LevelInfo, "chromium renderer summary",
+			slog.Int("rendererCount", len(renderers)),
 		)
 	}
 }
