@@ -92,11 +92,24 @@ summary counts.
 |---|---|
 | `cgroupRSS` | Total memory used by all processes in the container cgroup, in bytes. Kernel-maintained; deduplicates shared pages. This is the ground truth for "how much memory did this check use." |
 | `processCount` | Number of processes found in the cgroup at teardown |
-| `rendererCount` | Number of CDP page targets from which renderer metrics were collected |
 
 `cgroupRSS` is read from `memory.current` (cgroupsv2) or `memory.usage_in_bytes`
 (cgroupsv1). Unlike the sum of per-process `rss` values, it counts each physical
 page exactly once regardless of how many processes share it.
+
+This entry is gated on `-process-metrics`.
+
+---
+
+### `chromium renderer summary`
+
+One entry per session, emitted when `-cdp-metrics` is enabled. `rendererCount`
+is a CDP concept, so it lives on its own line independent of `-process-metrics`
+rather than on `chromium session memory`.
+
+| Field | Description |
+|---|---|
+| `rendererCount` | Number of CDP page targets from which renderer metrics were collected |
 
 ---
 
@@ -151,14 +164,16 @@ Always active; does not require `-cdp-metrics`.
 
 ### `sm_crocochrome_cdp_collection_duration_seconds`
 
-Histogram. Records the wall-clock time spent on the full teardown collection window
-(process RSS walk + CDP renderer metrics) when `-cdp-metrics` is enabled. Zero
-observations when the flag is off.
+Histogram. Records the wall-clock time spent on the CDP collection window only —
+the `/json/list` enumeration plus the per-renderer `Performance.getMetrics`
+round-trips — when `-cdp-metrics` is enabled. It does **not** include the process
+RSS walk. Zero observations when the flag is off.
 
-The distribution is expected to be bimodal:
-- **< 50ms**: normal path — Chromium is alive, CDP responds quickly, file reads are fast.
-- **≈ 300ms**: Chromium was already dead when `Delete()` ran (session timeout race);
-  the CDP dial times out after 300ms before SIGKILL is sent.
+CDP metrics are collected while Chromium is still alive, before the session
+context is cancelled (SIGKILL). In normal operation the distribution therefore
+sits well below the 300ms collection ceiling — typically under ~50ms, scaling
+with the number of renderer targets. Observations near 300ms indicate a renderer
+that stopped responding and hit the collection timeout, not the common case.
 
 This overhead sits inside the `DELETE /sessions` response path — see
 [Deployment note in the PR](https://github.com/grafana/crocochrome/pull/438) for
