@@ -83,6 +83,10 @@ func chromiumTargets(ctx context.Context, wsURL string) ([]chromiumTarget, error
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("/json/list returned status %d", resp.StatusCode)
+	}
+
 	var targets []chromiumTarget
 	if err := json.NewDecoder(resp.Body).Decode(&targets); err != nil {
 		return nil, fmt.Errorf("decoding /json/list response: %w", err)
@@ -132,12 +136,15 @@ func cdpPerformanceMetrics(ctx context.Context, wsURL string) ([]slog.Attr, erro
 	}
 	defer conn.Close() //nolint:errcheck // best-effort close
 
-	// Propagate the context deadline to the connection so that ReadMessage calls
-	// are also bounded. DialContext clears the deadline after the handshake, so
-	// we must re-apply it explicitly.
+	// Propagate the context deadline to the connection so that ReadMessage and WriteJSON
+	// calls are also bounded. DialContext clears the deadline after the handshake, so we
+	// must re-apply it explicitly.
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := conn.SetReadDeadline(deadline); err != nil {
 			return nil, fmt.Errorf("setting read deadline: %w", err)
+		}
+		if err := conn.SetWriteDeadline(deadline); err != nil {
+			return nil, fmt.Errorf("setting write deadline: %w", err)
 		}
 	}
 
@@ -157,7 +164,8 @@ func cdpPerformanceMetrics(ctx context.Context, wsURL string) ([]slog.Attr, erro
 		return nil, fmt.Errorf("sending Performance.enable: %w", err)
 	}
 
-	if err := readCDPResponse(conn, idEnable); err != nil {
+	var enableResp cdpResponse
+	if err := readCDPResponseInto(conn, idEnable, &enableResp); err != nil {
 		return nil, fmt.Errorf("reading Performance.enable response: %w", err)
 	}
 
@@ -171,10 +179,6 @@ func cdpPerformanceMetrics(ctx context.Context, wsURL string) ([]slog.Attr, erro
 		return nil, fmt.Errorf("reading Performance.getMetrics response: %w", err)
 	}
 
-	if resp.Error != nil {
-		return nil, fmt.Errorf("CDP error %d: %s", resp.Error.Code, resp.Error.Message)
-	}
-
 	attrs := make([]slog.Attr, 0, len(resp.Result.Metrics))
 	for _, m := range resp.Result.Metrics {
 		attrs = append(attrs, slog.Attr{Key: m.Name, Value: slog.Float64Value(m.Value)})
@@ -183,15 +187,10 @@ func cdpPerformanceMetrics(ctx context.Context, wsURL string) ([]slog.Attr, erro
 	return attrs, nil
 }
 
-// readCDPResponse reads CDP messages from conn until it sees one with the expected ID,
-// discarding unsolicited event messages (id == 0 or missing). Returns an error if the
-// response contains a CDP-level error.
-func readCDPResponse(conn *websocket.Conn, expectedID int) error {
-	return readCDPResponseInto(conn, expectedID, nil)
-}
-
-// readCDPResponseInto is like readCDPResponse but unmarshals the matched message into dst
-// when dst is non-nil.
+// readCDPResponseInto reads CDP messages from conn until it sees one with the expected ID,
+// discarding unsolicited event messages (id == 0 or missing) and responses to other
+// commands. When dst is non-nil the matched message is unmarshalled into it and a CDP-level
+// error in the response is returned as an error; pass nil to only wait for the ID.
 func readCDPResponseInto(conn *websocket.Conn, expectedID int, dst *cdpResponse) error {
 	for {
 		_, raw, err := conn.ReadMessage()
@@ -218,6 +217,9 @@ func readCDPResponseInto(conn *websocket.Conn, expectedID int, dst *cdpResponse)
 		if dst != nil {
 			if err := json.Unmarshal(raw, dst); err != nil {
 				return fmt.Errorf("unmarshalling CDP response: %w", err)
+			}
+			if dst.Error != nil {
+				return fmt.Errorf("CDP error %d: %s", dst.Error.Code, dst.Error.Message)
 			}
 		}
 
