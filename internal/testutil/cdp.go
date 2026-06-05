@@ -3,7 +3,6 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -103,30 +102,6 @@ func ChromiumVersionHandlerWithCDP(wsURL string) http.HandlerFunc {
 		rw.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(rw).Encode(resp)
 	}
-}
-
-// StartChromiumWithTargets starts an httptest.Server that serves both /json/version and
-// /json/list, mirroring real Chromium's debug server where both endpoints share one port.
-// The webSocketDebuggerUrl in /json/version automatically points back to this same server,
-// so chromiumTargets() correctly derives /json/list from the session's stored URL.
-//
-// pageTargets are the fake page targets returned by /json/list. Use CDPServer to create
-// CDP WebSocket endpoints for them. Returns the port string for Options.ChromiumPort.
-func StartChromiumWithTargets(t *testing.T, pageTargets []CDPTargetInfo) string {
-	t.Helper()
-
-	var handler http.HandlerFunc
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r)
-	}))
-	t.Cleanup(server.Close)
-
-	// server.URL is "http://127.0.0.1:PORT"; rewrite as a ws:// URL for the version response.
-	browserWsURL := "ws://" + server.URL[len("http://"):] + "/devtools/browser/test"
-	handler = ChromiumHandlerWithCDPTargets(browserWsURL, pageTargets)
-
-	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
-	return port
 }
 
 // CDPServer starts a fake Chromium DevTools Protocol WebSocket server that handles
