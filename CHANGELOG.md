@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.1](https://github.com/grafana/crocochrome/compare/v0.12.0...v0.12.1) (2026-06-10)
+
+
+### Fixes
+
+* Add architecture docs ([7b502e7](https://github.com/grafana/crocochrome/commit/7b502e7d903ff61dcead4f04cb4d1247654beb04))
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/create-github-app-token action to v0.3.1 ([3943841](https://github.com/grafana/crocochrome/commit/39438412941d3d8fd63f1da05f842f569d03e26c))
+* **renovate:** Fix renovate k6 version upgrades ([#484](https://github.com/grafana/crocochrome/issues/484)) ([cba10e8](https://github.com/grafana/crocochrome/commit/cba10e8e9f15e06e24b5fc32d4267309af2061b8))
+* Update actions/checkout action to v6.0.3 ([16e9b6c](https://github.com/grafana/crocochrome/commit/16e9b6c10f136bdd3331e072083f182b60333cd1))
+* Update actions/checkout digest to df4cb1c ([8a68995](https://github.com/grafana/crocochrome/commit/8a68995de067cedbe4e73cd837fa9ac7ab0d2a9e))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:148.0.7778.178-r0-3.23.4 Docker digest to 5a54c7f ([3eeec51](https://github.com/grafana/crocochrome/commit/3eeec51064521512397cf600c7f03651b60efe64))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:148.0.7778.178-r0-3.23.4 Docker digest to 6bafeee ([8d14850](https://github.com/grafana/crocochrome/commit/8d14850c4f3527463459c5c39b45cfc4f8971dd6))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.40.1 ([3d03c35](https://github.com/grafana/crocochrome/commit/3d03c35ea402b1ed8cd4e63ee52bb7e784f40410))
+* Update module golang.org/x/sync to v0.21.0 ([b9c9909](https://github.com/grafana/crocochrome/commit/b9c99099c20ce8d08d5653122b604218a5ea3d93))
+
 ## [0.12.0](https://github.com/grafana/crocochrome/compare/v0.11.1...v0.12.0) (2026-06-02)
 
 
