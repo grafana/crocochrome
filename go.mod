@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/procfs v0.20.1
 	github.com/testcontainers/testcontainers-go v0.42.0
