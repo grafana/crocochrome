@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.3](https://github.com/grafana/crocochrome/compare/v0.12.2...v0.12.3) (2026-06-26)
+
+
+### Miscellaneous Chores
+
+* Update actions/setup-go digest to 924ae3a ([#503](https://github.com/grafana/crocochrome/issues/503)) ([70c63e8](https://github.com/grafana/crocochrome/commit/70c63e8de26172f59040fe3393bb3fe924c0ff81))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to d6d6a5d ([#502](https://github.com/grafana/crocochrome/issues/502)) ([e957a84](https://github.com/grafana/crocochrome/commit/e957a8485d5c27e868e16b271771667ecd38693d))
+* Update module github.com/moby/moby/api to v1.55.0 ([#499](https://github.com/grafana/crocochrome/issues/499)) ([757de29](https://github.com/grafana/crocochrome/commit/757de2906b88e6b0a490b89a0c2ff8249bde7424))
+* Update testcontainers-go monorepo to v0.43.0 ([#500](https://github.com/grafana/crocochrome/issues/500)) ([be6e677](https://github.com/grafana/crocochrome/commit/be6e67716a543d9b5e9dc46d37ad04eb6f72873b))
+
 ## [0.12.2](https://github.com/grafana/crocochrome/compare/v0.12.1...v0.12.2) (2026-06-22)
 
 
