@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.4](https://github.com/grafana/crocochrome/compare/v0.12.3...v0.12.4) (2026-07-02)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-buildx-action digest to bb05f3f ([#510](https://github.com/grafana/crocochrome/issues/510)) ([add70c9](https://github.com/grafana/crocochrome/commit/add70c9acd77c305188c47ec0cbb00ed2352ac76))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.42.0 ([#504](https://github.com/grafana/crocochrome/issues/504)) ([9123185](https://github.com/grafana/crocochrome/commit/9123185f64bee376020a1424f353074efca70ddd))
+* Update module github.com/prometheus/procfs to v0.21.0 ([#505](https://github.com/grafana/crocochrome/issues/505)) ([1040b7a](https://github.com/grafana/crocochrome/commit/1040b7ac3b71cd431f5d6232657193e166ad4e81))
+
 ## [0.12.3](https://github.com/grafana/crocochrome/compare/v0.12.2...v0.12.3) (2026-06-26)
 
 
