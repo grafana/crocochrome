@@ -27,6 +27,7 @@ type Config struct {
 	UserGroup            int
 	TempDir              string
 	EnableProcessMetrics bool
+	EnableCDPMetrics     bool
 }
 
 func main() {
@@ -38,6 +39,7 @@ func main() {
 	flag.StringVar(&config.TempDir, "temp-dir", "/chromium-tmp", "Directory for chromiumium instances to write their data to")
 	flag.IntVar(&config.UserGroup, "user-group", 65534, "Default user to run as. For local development, set this flag to 0")
 	flag.BoolVar(&config.EnableProcessMetrics, "process-metrics", false, "Enable per-process RSS collection at session teardown. Adds negligible overhead.")
+	flag.BoolVar(&config.EnableCDPMetrics, "cdp-metrics", false, "Enable CDP Performance.getMetrics collection at session teardown. Adds ≤300ms overhead to each DELETE /sessions call.")
 
 	flag.Parse()
 	if err := run(logger, config); err != nil {
@@ -72,6 +74,7 @@ func run(logger *slog.Logger, config *Config) error {
 		Registry:             registry,
 		ExtraUATerms:         "GrafanaSyntheticMonitoring",
 		EnableProcessMetrics: config.EnableProcessMetrics,
+		EnableCDPMetrics:     config.EnableCDPMetrics,
 	})
 
 	err := supervisor.ComputeUserAgent(context.Background())

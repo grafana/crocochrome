@@ -88,6 +88,14 @@ type SupervisorMetrics struct {
 	// tree (renderer, GPU process, etc.) exceeded the container memory limit and had one or more
 	// processes killed, even if crocochrome itself survived.
 	OOMKills prometheus.Counter
+	// CDPCollectionDuration records the wall-clock time spent on the CDP collection window in
+	// Delete(): the /json/list enumeration plus the per-renderer Performance.getMetrics
+	// round-trips. It does not include the process RSS walk. Collection runs while Chromium is
+	// still alive (before SIGKILL), so observations normally sit well below the 300ms ceiling
+	// (typically <50ms, scaling with renderer count); values near 300ms mean a renderer stopped
+	// responding and hit the timeout.
+	// Only populated when the -cdp-metrics flag is enabled; zero observations otherwise.
+	CDPCollectionDuration prometheus.Histogram
 }
 
 // Supervisor registers and returns handlers for metrics used by the supervisor.
@@ -140,12 +148,25 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 					"memory events file increases between session start and session end.",
 			},
 		),
+		CDPCollectionDuration: prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace:                       metricNs,
+				Subsystem:                       metricSubsystemCrocochrome,
+				Name:                            "cdp_collection_duration_seconds",
+				Help:                            "Wall-clock time spent on the CDP Performance.getMetrics call at session teardown.",
+				Buckets:                         prometheus.ExponentialBucketsRange(0.001, 0.35, 8),
+				NativeHistogramBucketFactor:     1.2,
+				NativeHistogramMaxBucketNumber:  32,
+				NativeHistogramMinResetDuration: 1 * time.Hour,
+			},
+		),
 	}
 
 	reg.MustRegister(m.SessionDuration)
 	reg.MustRegister(m.ChromiumExecutions)
 	reg.MustRegister(m.ChromiumResources)
 	reg.MustRegister(m.OOMKills)
+	reg.MustRegister(m.CDPCollectionDuration)
 
 	return m
 }

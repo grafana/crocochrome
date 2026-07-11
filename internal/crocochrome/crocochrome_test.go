@@ -203,29 +203,112 @@ func TestCrocochrome(t *testing.T) {
 		}
 	})
 
-	t.Run("terminates a session after timeout", func(t *testing.T) {
+	t.Run("logs per-renderer and per-process metrics on Delete", func(t *testing.T) {
 		t.Parallel()
 
-		hb := testutil.NewHeartbeat(t)
-		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
-		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-		_, err := cc.Create(crocochrome.CheckInfo{})
+		// Launch the test binary itself as a fake Chromium (see fakechromium_test.go) so its
+		// /json/list and CDP endpoints live inside the very process the supervisor SIGKILLs on
+		// cancel. This binds the CDP endpoints to the session lifecycle: the test passes only
+		// if collection runs while Chromium is alive (before cancel). A regression that moves
+		// collection after cancel hits a dead port and fails the renderer assertions below.
+		exe, err := os.Executable()
+		if err != nil {
+			t.Fatalf("locating test executable: %v", err)
+		}
+		port := freeTCPPort(t)
+
+		// Set up a fake cgroup dir and proc dir so process metrics can be collected.
+		cgroupDir := t.TempDir()
+		procRoot := t.TempDir()
+
+		writeFile := func(path, content string) {
+			t.Helper()
+			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		eventsPath := cgroupDir + "/memory.events"
+		writeFile(eventsPath, "oom_kill 0\n")
+		writeFile(cgroupDir+"/cgroup.procs", "9001\n")
+		writeFile(cgroupDir+"/memory.current", "314572800\n") // 300 MiB
+
+		if err := os.MkdirAll(procRoot+"/9001", 0755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(procRoot+"/9001/cmdline", "/usr/bin/chromium\x00--no-sandbox\x00")
+		writeFile(procRoot+"/9001/status", "VmHWM:\t 250000 kB\nVmRSS:\t 200000 kB\n")
+
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:           exe,
+			ChromiumPort:           port,
+			EnableProcessMetrics:   true,
+			EnableCDPMetrics:       true,
+			CgroupMemoryEventsPath: eventsPath,
+			ProcFSRoot:             procRoot,
+		})
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
 
-		hb.AssertAliveDead(1, 0)
+		cc.Delete(sess.ID)
+		cc.Wait()
 
-		time.Sleep(4 * time.Second)
+		logs := buf.String()
 
-		hb.AssertAliveDead(0, 1)
-
-		t.Run("session is removed from list", func(t *testing.T) {
-			if list := cc.Sessions(); len(list) > 0 {
-				t.Fatalf("expected sessions list to be empty, not %v", list)
+		// Per-renderer: metric names and target URLs must appear.
+		for name := range testutil.CDPPerformanceMetrics {
+			if !strings.Contains(logs, name) {
+				t.Errorf("expected CDP metric %q in logs\nLogs:\n%s", name, logs)
 			}
-		})
+		}
+		for _, want := range []string{
+			"chromium renderer metrics",
+			"targetURL=https://example.com",
+			"targetURL=https://other.com",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+
+		// Per-process: the fake browser process entry must appear, including peakRSS.
+		for _, want := range []string{
+			"chromium process memory",
+			"pid=9001",
+			"processType=browser",
+			"peakRSS=256000000", // 250000 kB * 1024
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+
+		// Process summary entry must appear with the cgroup total. rendererCount lives on its
+		// own CDP-gated line (see below), not here.
+		for _, want := range []string{
+			"chromium session memory",
+			"cgroupRSS=314572800",
+			"processCount=1",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
+
+		// CDP renderer summary is gated independently of process metrics.
+		for _, want := range []string{
+			"chromium renderer summary",
+			"rendererCount=2",
+		} {
+			if !strings.Contains(logs, want) {
+				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+			}
+		}
 	})
 
 	t.Run("increments OOM kill counter when cgroup reports a kill during session", func(t *testing.T) {
@@ -271,6 +354,8 @@ func TestCrocochrome(t *testing.T) {
 			t.Fatal("expected sm_crocochrome_chromium_oom_kills_total to be present in registry")
 		}
 
+		// GatherAndCount above only confirms the metric is present; GatherAndCompare verifies
+		// the actual counter value.
 		const wantMetric = `# HELP sm_crocochrome_chromium_oom_kills_total Total number of times the kernel OOM-killer fired within the container cgroup during a Chromium session. Incremented when the oom_kill counter in the cgroup memory events file increases between session start and session end.
 # TYPE sm_crocochrome_chromium_oom_kills_total counter
 sm_crocochrome_chromium_oom_kills_total 1
@@ -281,74 +366,28 @@ sm_crocochrome_chromium_oom_kills_total 1
 		}
 	})
 
-	t.Run("logs per-process metrics and session summary on Delete", func(t *testing.T) {
+	t.Run("terminates a session after timeout", func(t *testing.T) {
 		t.Parallel()
-
-		var buf bytes.Buffer
-		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
 
-		// Set up a fake cgroup dir and proc dir so process metrics can be collected.
-		cgroupDir := t.TempDir()
-		procRoot := t.TempDir()
-
-		writeFile := func(path, content string) {
-			t.Helper()
-			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		eventsPath := cgroupDir + "/memory.events"
-		writeFile(eventsPath, "oom_kill 0\n")
-		writeFile(cgroupDir+"/cgroup.procs", "9001\n")
-		writeFile(cgroupDir+"/memory.current", "314572800\n") // 300 MiB
-
-		if err := os.MkdirAll(procRoot+"/9001", 0755); err != nil {
-			t.Fatal(err)
-		}
-		writeFile(procRoot+"/9001/cmdline", "/usr/lib/chromium/chromium\x00--no-sandbox\x00")
-		writeFile(procRoot+"/9001/status", "VmHWM:\t 250000 kB\nVmRSS:\t 200000 kB\n")
-
-		cc := crocochrome.New(logger, crocochrome.Options{
-			ChromiumPath:           hb.Path,
-			ChromiumPort:           port,
-			EnableProcessMetrics:   true,
-			CgroupMemoryEventsPath: eventsPath,
-			ProcFSRoot:             procRoot,
-		})
-
-		sess, err := cc.Create(crocochrome.CheckInfo{})
+		_, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
 			t.Fatalf("creating session: %v", err)
 		}
 
-		cc.Delete(sess.ID)
-		cc.Wait()
+		hb.AssertAliveDead(1, 0)
 
-		logs := buf.String()
+		time.Sleep(4 * time.Second)
 
-		for _, want := range []string{
-			"chromium process memory",
-			"pid=9001",
-			"processType=browser",
-			"peakRSS=256000000", // 250000 kB * 1024
-		} {
-			if !strings.Contains(logs, want) {
-				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
+		hb.AssertAliveDead(0, 1)
+
+		t.Run("session is removed from list", func(t *testing.T) {
+			if list := cc.Sessions(); len(list) > 0 {
+				t.Fatalf("expected sessions list to be empty, not %v", list)
 			}
-		}
-
-		for _, want := range []string{
-			"chromium session memory",
-			"cgroupRSS=314572800",
-			"processCount=1",
-		} {
-			if !strings.Contains(logs, want) {
-				t.Errorf("expected %q in logs\nLogs:\n%s", want, logs)
-			}
-		}
+		})
 	})
 }
