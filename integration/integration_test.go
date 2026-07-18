@@ -83,20 +83,37 @@ func TestIntegration(t *testing.T) {
 		name   string
 		image  string
 		script string
+		// crocoHost is the host:port k6 uses to reach crocochrome. When it is not
+		// localhost, k6 joins the shared network by name instead of sharing
+		// crocochrome's network namespace, exercising the non-localhost Host path
+		// (regression test for https://github.com/grafana/crocochrome/issues/519).
+		crocoHost string
 	}{
-		{"k6-v1/simple browser test", k6V1ImageVersion, scriptk6io},
-		{"k6-v2/simple browser test", k6V2ImageVersion, scriptk6io},
+		{"k6-v1/simple browser test", k6V1ImageVersion, scriptk6io, "localhost:8080"},
+		{"k6-v2/simple browser test", k6V2ImageVersion, scriptk6io, "localhost:8080"},
+		{"k6-v2/non-localhost host", k6V2ImageVersion, scriptk6io, ccName + ":8080"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			localhost := tc.crocoHost == "localhost:8080"
+
+			req := testcontainers.ContainerRequest{
+				Image:      tc.image,
+				Entrypoint: []string{"/bin/sleep", "infinity"},
+			}
+			if localhost {
+				// Share crocochrome's network namespace so k6 reaches it at localhost.
+				req.HostConfigModifier = func(hc *container.HostConfig) {
+					hc.NetworkMode = container.NetworkMode("container:" + cc.GetContainerID())
+				}
+			} else {
+				// Join the shared network by name so k6 resolves crocochrome by its
+				// container name, reaching it over a non-localhost Host.
+				req.Networks = []string{network.Name}
+			}
+
 			k6, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-				Started: true,
-				ContainerRequest: testcontainers.ContainerRequest{
-					Image:      tc.image,
-					Entrypoint: []string{"/bin/sleep", "infinity"},
-					HostConfigModifier: func(hc *container.HostConfig) {
-						hc.NetworkMode = container.NetworkMode("container:" + cc.GetContainerID())
-					},
-				},
+				Started:          true,
+				ContainerRequest: req,
 			})
 			testcontainers.CleanupContainer(t, k6)
 			if err != nil {
@@ -127,7 +144,7 @@ func TestIntegration(t *testing.T) {
 				ctx,
 				[]string{"k6", "run", scriptPath},
 				exec.Multiplexed(),
-				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://localhost:8080/proxy/" + session.ID}),
+				exec.WithEnv([]string{"K6_BROWSER_WS_URL=ws://" + tc.crocoHost + "/proxy/" + session.ID}),
 			)
 			if err != nil {
 				t.Fatalf("running k6 script: %v", err)
