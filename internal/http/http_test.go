@@ -2,14 +2,18 @@ package http_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/gorilla/websocket"
 	"github.com/grafana/crocochrome/internal/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/internal/http"
 	"github.com/grafana/crocochrome/internal/testutil"
@@ -68,4 +72,108 @@ func TestHTTP(t *testing.T) {
 			t.Fatalf("expected returned url to be replaced to /proxy, got %q", parsedURL.String())
 		}
 	})
+
+	// Regression test for https://github.com/grafana/crocochrome/issues/519.
+	// Chromium 149+ rejects a WS upgrade whose Host header is not an IP or localhost
+	// (DevTools DNS-rebinding protection). The proxy must dial Chromium with the
+	// backend's Host (127.0.0.1:<port>), not forward the client's Host.
+	t.Run("proxy dials chromium with backend Host, not the client's", func(t *testing.T) {
+		// Stand up a mock that plays Chromium: it serves /json/version (pointing the
+		// debugger URL at itself over an IP host) and a WS endpoint that mimics
+		// Chromium 149 by rejecting any non-IP, non-localhost Host.
+		var recordedHost atomic.Pointer[string]
+		upgrader := websocket.Upgrader{
+			CheckOrigin: func(*http.Request) bool { return true },
+		}
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/devtools/browser/", func(rw http.ResponseWriter, r *http.Request) {
+			host := r.Host
+			recordedHost.Store(&host)
+
+			// Mimic Chromium 149's DNS-rebinding protection.
+			if !isIPOrLocalhost(host) {
+				rw.WriteHeader(http.StatusInternalServerError)
+				_, _ = rw.Write([]byte("Host header is specified and is not an IP address or localhost."))
+				return
+			}
+
+			conn, err := upgrader.Upgrade(rw, r, nil)
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		})
+
+		var wsHost string
+		mux.HandleFunc("GET /json/version", func(rw http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(rw, `{"webSocketDebuggerUrl": "ws://%s/devtools/browser/abc"}`, wsHost)
+		})
+
+		chromium := httptest.NewServer(mux)
+		t.Cleanup(chromium.Close)
+		wsHost = chromium.Listener.Addr().String() // 127.0.0.1:<port>
+
+		_, port, err := net.SplitHostPort(wsHost)
+		if err != nil {
+			t.Fatalf("splitting mock chromium address: %v", err)
+		}
+
+		hb := testutil.NewHeartbeat(t)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+		if session.ID == "" {
+			t.Fatalf("session ID is empty")
+		}
+
+		// Connect to the proxy exactly like a CDP client reaching us over a
+		// service/DNS name: a non-localhost Host and no Origin.
+		proxyURL := "ws://" + server.Listener.Addr().String() + "/proxy/" + session.ID
+		header := http.Header{}
+		header.Set("Host", "crocochrome-abc:8080")
+
+		conn, wsResp, err := websocket.DefaultDialer.Dial(proxyURL, header)
+		if err != nil {
+			status := 0
+			if wsResp != nil {
+				status = wsResp.StatusCode
+			}
+			t.Fatalf("proxy handshake failed (status %d): %v", status, err)
+		}
+		_ = conn.Close()
+
+		got := recordedHost.Load()
+		if got == nil {
+			t.Fatalf("mock chromium never received a connection")
+		}
+		if *got != wsHost {
+			t.Fatalf("chromium received Host %q, want backend host %q", *got, wsHost)
+		}
+	})
+}
+
+// isIPOrLocalhost reports whether the host part of a host[:port] string is an IP
+// address or "localhost", mirroring Chromium 149's DevTools Host check.
+func isIPOrLocalhost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	return host == "localhost" || net.ParseIP(host) != nil
 }

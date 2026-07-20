@@ -123,6 +123,17 @@ func (s *Server) Proxy(rw http.ResponseWriter, r *http.Request) {
 		Backend: func(r *http.Request) *url.URL {
 			return chromiumURL
 		},
+		// Chromium 149+ DevTools rejects any Host that is not an IP or localhost
+		// (DNS-rebinding protection). websocketproxy forwards the client's Host by
+		// default; override it with the backend's own advertised host — the address
+		// Chromium itself is listening on (loopback; 127.0.0.1:<port> on Chromium
+		// 149), which Chromium's Host check accepts by construction. Also drop any
+		// forwarded Origin, which would be rejected the same way (CDP clients don't
+		// send one).
+		Director: func(_ *http.Request, out http.Header) {
+			out.Set("Host", chromiumURL.Host)
+			out.Del("Origin")
+		},
 	}
 	wsp.ServeHTTP(rw, r)
 }
