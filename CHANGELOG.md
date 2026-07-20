@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.12.5](https://github.com/grafana/crocochrome/compare/v0.12.4...v0.12.5) (2026-07-20)
+
+
+### Fixes
+
+* set WS proxy Host to Chromium's own host ([#520](https://github.com/grafana/crocochrome/issues/520)) ([b07e2ef](https://github.com/grafana/crocochrome/commit/b07e2ef7840208a56bb6b6202e2c3ad8fa75ef26)), closes [#519](https://github.com/grafana/crocochrome/issues/519)
+
+
+### Miscellaneous Chores
+
+* Update actions/setup-go action to v7 ([#521](https://github.com/grafana/crocochrome/issues/521)) ([69376a9](https://github.com/grafana/crocochrome/commit/69376a93a3402e238f340e5f01dcdaea23da28ca))
+* Update docker/build-push-action digest to 53b7df9 ([#508](https://github.com/grafana/crocochrome/issues/508)) ([6d2a6e5](https://github.com/grafana/crocochrome/commit/6d2a6e5839e1666064b26abaed1cfa818c811505))
+* Update docker/login-action digest to af1e73f ([#509](https://github.com/grafana/crocochrome/issues/509)) ([b6b84a3](https://github.com/grafana/crocochrome/commit/b6b84a34442464de680a1cac95a8ddbfc3f22b1a))
+* Update docker/setup-qemu-action digest to 96fe6ef ([#506](https://github.com/grafana/crocochrome/issues/506)) ([24800dc](https://github.com/grafana/crocochrome/commit/24800dc0a19584a629ea57b7202da0052995ee03))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to 35312b0 ([#511](https://github.com/grafana/crocochrome/issues/511)) ([c3c1d92](https://github.com/grafana/crocochrome/commit/c3c1d92a525c3588c3af6009f30bea9078272a5e))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to 5b66d43 ([#518](https://github.com/grafana/crocochrome/issues/518)) ([b77c2c6](https://github.com/grafana/crocochrome/commit/b77c2c698f25e1b6f2f48ee592a57a220082e4d0))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.43.0 ([#515](https://github.com/grafana/crocochrome/issues/515)) ([8044cf9](https://github.com/grafana/crocochrome/commit/8044cf91fe8414eca842d9b4defdd9c2b179c1e0))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.43.1 ([#517](https://github.com/grafana/crocochrome/issues/517)) ([5ce54c4](https://github.com/grafana/crocochrome/commit/5ce54c4e5fae8083f2c891d38fa022c53f7342c7))
+* Update grafana/k6-v2 Docker tag to v2.1.0 ([#512](https://github.com/grafana/crocochrome/issues/512)) ([9f212a0](https://github.com/grafana/crocochrome/commit/9f212a0da15858617f07afbf4f524ce32d65ea3b))
+* Update module github.com/prometheus/procfs to v0.21.1 ([#513](https://github.com/grafana/crocochrome/issues/513)) ([d0350ae](https://github.com/grafana/crocochrome/commit/d0350aec898e1e606c9ca671c761002d30e0c4e9))
+* Update module golang.org/x/sync to v0.22.0 ([#514](https://github.com/grafana/crocochrome/issues/514)) ([a2eb91a](https://github.com/grafana/crocochrome/commit/a2eb91ad505f5cd6ff8f9a47e6b17b800d7fe0a7))
+
 ## [0.12.4](https://github.com/grafana/crocochrome/compare/v0.12.3...v0.12.4) (2026-07-02)
 
 
