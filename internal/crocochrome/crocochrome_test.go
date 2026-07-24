@@ -2,11 +2,13 @@ package crocochrome_test
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"net/url"
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -144,6 +146,118 @@ func TestCrocochrome(t *testing.T) {
 				t.Fatalf("session list %v should not contain terminated session %q", list, sess1.ID)
 			}
 		})
+	})
+
+	t.Run("CreateIfFree creates a session when free", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		session, err := cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if list := cc.Sessions(); !slices.Contains(list, session.ID) {
+			t.Fatalf("session ID %q not found in sessions list %v", session.ID, list)
+		}
+	})
+
+	t.Run("CreateIfFree does not terminate an existing session", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess1, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		_, err = cc.CreateIfFree(crocochrome.CheckInfo{})
+		if !errors.Is(err, crocochrome.ErrSessionExists) {
+			t.Fatalf("expected ErrSessionExists, got: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if list := cc.Sessions(); len(list) != 1 || !slices.Contains(list, sess1.ID) {
+			t.Fatalf("expected sessions list to contain only %q, got %v", sess1.ID, list)
+		}
+	})
+
+	t.Run("CreateIfFree succeeds after the session is deleted", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess, err := cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		cc.Delete(sess.ID)
+
+		_, err = cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session after delete: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 1)
+	})
+
+	t.Run("concurrent CreateIfFree yields exactly one session", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		const concurrency = 10
+
+		errs := make([]error, concurrency)
+		var wg sync.WaitGroup
+		for i := range concurrency {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, errs[i] = cc.CreateIfFree(crocochrome.CheckInfo{})
+			}()
+		}
+		wg.Wait()
+
+		var successes, conflicts int
+		for _, err := range errs {
+			switch {
+			case err == nil:
+				successes++
+			case errors.Is(err, crocochrome.ErrSessionExists):
+				conflicts++
+			default:
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+
+		if successes != 1 || conflicts != concurrency-1 {
+			t.Fatalf("expected 1 success and %d conflicts, got %d and %d", concurrency-1, successes, conflicts)
+		}
+
+		if list := cc.Sessions(); len(list) != 1 {
+			t.Fatalf("expected exactly one session, got %v", list)
+		}
+
+		hb.AssertAliveDead(1, 0)
 	})
 
 	t.Run("creates a session with nil metadata", func(t *testing.T) {

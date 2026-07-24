@@ -23,6 +23,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// ErrSessionExists is returned by CreateIfFree when a session is already active.
+var ErrSessionExists = errors.New("a session already exists")
+
 type Supervisor struct {
 	opts    Options
 	logger  *slog.Logger
@@ -192,8 +195,24 @@ func (s *Supervisor) Sessions() []string {
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
 func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
+	return s.create(checkInfo, false)
+}
+
+// CreateIfFree creates a new browser session only if no session is currently active, returning ErrSessionExists
+// otherwise. Unlike Create, it never terminates an existing session.
+func (s *Supervisor) CreateIfFree(checkInfo CheckInfo) (SessionInfo, error) {
+	return s.create(checkInfo, true)
+}
+
+// create creates a new browser session. If ifFree is true and a session already exists, it returns ErrSessionExists;
+// otherwise existing sessions are terminated before creating the new one.
+func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
+
+	if ifFree && len(s.sessions) > 0 {
+		return SessionInfo{}, ErrSessionExists
+	}
 
 	s.killExisting()
 
