@@ -300,6 +300,8 @@ func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, erro
 		logger: logger,
 	}
 
+	s.setSessionActive()
+
 	return si, nil
 }
 
@@ -343,6 +345,7 @@ func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	}
 
 	delete(s.sessions, sessionID)
+	s.setSessionInactive()
 	sess.cancel()
 
 	return sess, true
@@ -405,6 +408,7 @@ func (s *Supervisor) delete(sessionID string) bool {
 		s.logger.Debug("cancelling context and deleting session", "sessionID", sessionID)
 		sess.cancel()
 		delete(s.sessions, sessionID)
+		s.setSessionInactive()
 		return true
 	}
 
@@ -418,6 +422,18 @@ func (s *Supervisor) killExisting() {
 		s.logger.Error("existing session found, killing", "sessionID", id)
 		s.delete(id)
 	}
+}
+
+// setSessionActive records that a session is now active.
+// Under the one-session model, session creation and removal map directly to
+// the active/inactive transitions.
+func (s *Supervisor) setSessionActive() {
+	s.metrics.SessionActive.Set(1)
+}
+
+// setSessionInactive records that no session is active.
+func (s *Supervisor) setSessionInactive() {
+	s.metrics.SessionActive.Set(0)
 }
 
 // launch prepares the requires directories and launches chromium, blocking

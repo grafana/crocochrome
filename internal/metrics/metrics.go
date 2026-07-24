@@ -83,6 +83,10 @@ type SupervisorMetrics struct {
 	SessionDuration    prometheus.Histogram
 	ChromiumExecutions *prometheus.CounterVec
 	ChromiumResources  *prometheus.HistogramVec
+	// SessionActive is 1 when a session is active and 0 otherwise. It is deliberately a boolean rather than a
+	// session count: fleet busy-ratio is avg() of this gauge across instances, with no assumption about
+	// per-instance capacity baked into the queries.
+	SessionActive prometheus.Gauge
 	// OOMKills counts the number of times the kernel OOM-killer fired within the container's
 	// cgroup during a Chromium session. A non-zero value indicates that Chromium's multi-process
 	// tree (renderer, GPU process, etc.) exceeded the container memory limit and had one or more
@@ -130,6 +134,14 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 			},
 			[]string{Resource},
 		),
+		SessionActive: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "session_active",
+				Help:      "Set to 1 when a session is active, 0 otherwise.",
+			},
+		),
 		OOMKills: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: metricNs,
@@ -145,6 +157,7 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 	reg.MustRegister(m.SessionDuration)
 	reg.MustRegister(m.ChromiumExecutions)
 	reg.MustRegister(m.ChromiumResources)
+	reg.MustRegister(m.SessionActive)
 	reg.MustRegister(m.OOMKills)
 
 	return m
