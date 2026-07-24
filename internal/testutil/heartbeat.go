@@ -20,8 +20,11 @@ set -e
 
 DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
+# Write to a temp file and rename: '>' truncates before writing, and a reader hitting that window would see an
+# empty file. The rename is atomic, and the temp name does not match the "canary-" prefix readers look for.
 while true; do
-	date '+%s' > "$DIR/canary-$$"
+	date '+%s' > "$DIR/.canary-$$.tmp"
+	mv "$DIR/.canary-$$.tmp" "$DIR/canary-$$"
 	sleep 1
 done
 `
