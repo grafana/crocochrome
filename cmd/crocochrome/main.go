@@ -80,7 +80,7 @@ func run(logger *slog.Logger, config *Config) error {
 	}
 
 	crocoHandler := crocohttp.New(logger, supervisor)
-	instrumentedHandler := metrics.InstrumentHTTP(registry, crocoHandler)
+	instrumentedHandler := metrics.InstrumentHTTP(registry, crocoHandler, crocohttp.Route)
 
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	mux.Handle("/", instrumentedHandler)
