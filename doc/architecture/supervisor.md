@@ -20,7 +20,11 @@ demand or on shutdown. It also computes the patched user agent and records
 session metrics.
 
 The defining rule, enforced here: **only one session may exist at a time.**
-Creating a session first kills any other session that exists.
+There are two ways to create a session, differing in how a conflict is
+resolved: `Create` kills any other session that exists (legacy semantics),
+while `CreateIfFree` fails with `ErrSessionExists` and never touches the
+running session (the atomic acquire used by pool clients via
+`POST /sessions/acquire`).
 
 ## Core types
 
@@ -44,6 +48,7 @@ type Supervisor struct {
     metrics     *metrics.SupervisorMetrics
     userAgent   string               // patched UA, computed once
     wg          *sync.WaitGroup      // tracks active sessions; Wait() blocks on it
+    draining    atomic.Bool          // set by Drain(); creations fail with ErrDraining
 }
 ```
 
@@ -70,15 +75,25 @@ Defaults are applied by `withDefaults()` in `New`.
 
 ## Public API
 
-| Function                | Purpose                                                                           |
-|-------------------------|-----------------------------------------------------------------------------------|
-| `New(logger, opts)`     | apply defaults, build the chromium client and metrics, return `*Supervisor`       |
-| `Session(id)`           | return the `*SessionInfo` for an ID, or `nil` (used by the WS proxy)              |
-| `Sessions()`            | return the list of active session IDs                                             |
-| `Create(checkInfo)`     | kill any existing session, launch Chromium, probe readiness, return `SessionInfo` |
-| `Delete(sessionID)`     | tear down a session (SIGKILL + teardown observability); returns `found`           |
-| `Wait()`                | block until no sessions are running (used by graceful shutdown)                   |
-| `ComputeUserAgent(ctx)` | launch Chromium once, read & patch its user agent                                 |
+| Function                  | Purpose                                                                                    |
+|---------------------------|--------------------------------------------------------------------------------------------|
+| `New(logger, opts)`       | apply defaults, build the chromium client and metrics, return `*Supervisor`               |
+| `Session(id)`             | return the `*SessionInfo` for an ID, or `nil` (used by the WS proxy)                      |
+| `Sessions()`              | return the list of active session IDs                                                     |
+| `Create(checkInfo)`       | kill any existing session, launch Chromium, probe readiness, return `SessionInfo`         |
+| `CreateIfFree(checkInfo)` | like `Create`, but fail with `ErrSessionExists` instead of killing an existing session    |
+| `Delete(sessionID)`       | tear down a session (SIGKILL + teardown observability); returns `found`                   |
+| `Drain()`                 | make all subsequent creations fail with `ErrDraining`; existing sessions unaffected       |
+| `Wait()`                  | block until no sessions are running (used by graceful shutdown)                           |
+| `SessionTimeout()`        | the resolved session timeout (used by `main.go` to derive the shutdown grace)             |
+| `ComputeUserAgent(ctx)`   | launch Chromium once, read & patch its user agent                                         |
+
+Both create variants share one unexported implementation (`create`), which
+first rejects with `ErrDraining` when `Drain` has been called, then either
+kills the existing session (`Create`) or rejects with `ErrSessionExists`
+(`CreateIfFree`). Because `create` holds `sessionsMtx` for its whole duration,
+`CreateIfFree` is a race-free check-and-create: concurrent acquires are
+serialized and exactly one can win.
 
 ## Session lifecycle
 
@@ -99,8 +114,11 @@ stateDiagram-v2
 
 `Create` holds `sessionsMtx` for its whole duration. It:
 
-1. Calls `killExisting()` to cancel any sessions already in the map (logged as an
-   error, since clients are expected to clean up after themselves).
+1. Fails with `ErrDraining` if `Drain()` has been called. Then, in the
+   `CreateIfFree` variant, fails with `ErrSessionExists` when the map is
+   non-empty; otherwise calls `killExisting()` to cancel any sessions already
+   in the map (logged as an error, since clients are expected to clean up
+   after themselves).
 2. Generates a random 12-hex-character ID (`randString()`).
 3. Builds a session-scoped logger, enriching it with the allowlisted metadata
    keys `regionID`, `tenantID`, and `id` (`allowedLabels`). These three together
@@ -116,7 +134,9 @@ stateDiagram-v2
 7. Probes Chromium with a 2-second timeout via
    `cclient.Version(ctx, localhost:port)`. On failure it cancels the session and
    returns the error (HTTP layer maps this to `500`).
-8. On success, stores the `session` in the map and returns the `SessionInfo`.
+8. On success, stores the `session` in the map, records the state transition
+   (`session_active` gauge to 1, `sessions_created_total` incremented — see
+   [observability.md](observability.md)), and returns the `SessionInfo`.
 
 ```mermaid
 sequenceDiagram
@@ -155,8 +175,17 @@ ENOENT (a process that exited mid-read) as an expected race and skip it. See
 
 > Note on the two delete paths: the unexported `delete(id)` assumes the caller
 > already holds the mutex and is used by `killExisting`. The exported `Delete`
-> takes the lock itself (via `takeSession`) and is the one `AfterFunc` and the
-> HTTP layer call.
+> takes the lock itself (via `takeSession`) and is the one the HTTP layer
+> calls; the timeout `AfterFunc` uses the same path via `deleteWithReason`.
+
+Every removal path records the state transition atomically with the map
+mutation, while still holding the mutex (`setSessionInactive(reason)`:
+`session_active` gauge to 0 plus a `sessions_terminated_total{reason}`
+increment). The reason reflects the path taken: `deleted` for an explicit
+`Delete`, `timeout` when the session deadline fired, `replaced` when
+`killExisting` terminated it. Updating under the lock matters: a freed slot
+can be re-acquired immediately by a concurrent create, and updating metrics
+outside the lock could publish "free" on a busy instance.
 
 ### Concurrency model
 
@@ -165,6 +194,9 @@ ENOENT (a process that exited mid-read) as an expected race and skip it. See
 - `wg` counts active sessions: `wg.Add(1)` in `Create`, `wg.Done()` when the
   `launch` goroutine returns. `Wait()` blocks on it and is what graceful
   shutdown uses to drain sessions.
+- `draining` is an `atomic.Bool` set by `Drain()` (never unset). Once set, the
+  create paths fail with `ErrDraining`, so the session count is monotonically
+  decreasing and `Wait()` is guaranteed to return within the session timeout.
 
 ## Launching Chromium
 
