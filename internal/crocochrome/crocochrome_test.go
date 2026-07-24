@@ -3,6 +3,7 @@ package crocochrome_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
@@ -293,6 +294,63 @@ func TestCrocochrome(t *testing.T) {
 		hb.AssertAliveDead(0, 1)
 	})
 
+	t.Run("tracks active sessions in a gauge", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+
+		assertSessionActive(t, reg, 0)
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		// Replacing the session via kill-existing keeps the gauge at 1.
+		sess, err = cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating second session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		cc.Delete(sess.ID)
+
+		assertSessionActive(t, reg, 0)
+	})
+
+	t.Run("clears the active sessions gauge when a session times out", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:   hb.Path,
+			ChromiumPort:   port,
+			SessionTimeout: 3 * time.Second,
+			Registry:       reg,
+		})
+
+		_, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		time.Sleep(4 * time.Second)
+
+		assertSessionActive(t, reg, 0)
+	})
+
 	t.Run("SessionTimeout returns the resolved timeout", func(t *testing.T) {
 		t.Parallel()
 
@@ -512,4 +570,18 @@ sm_crocochrome_chromium_oom_kills_total 1
 			}
 		}
 	})
+}
+
+// assertSessionActive checks that the session active gauge in reg has the given value.
+func assertSessionActive(t *testing.T, reg *prometheus.Registry, want float64) {
+	t.Helper()
+
+	wantMetric := fmt.Sprintf(`# HELP sm_crocochrome_session_active Set to 1 when a session is active, 0 otherwise.
+# TYPE sm_crocochrome_session_active gauge
+sm_crocochrome_session_active %g
+`, want)
+	if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantMetric),
+		"sm_crocochrome_session_active"); err != nil {
+		t.Errorf("session active gauge mismatch: %v", err)
+	}
 }
