@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -20,10 +21,20 @@ const (
 
 	Resource    = "resource"
 	ResourceRSS = "rss"
+
+	TerminationReason         = "reason"
+	TerminationReasonDeleted  = "deleted"
+	TerminationReasonTimeout  = "timeout"
+	TerminationReasonReplaced = "replaced"
 )
 
-// InstrumentHTTP uses promhttp to instrument a handler with total, duration, and in-flight requests.
-func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handler {
+// routeCtxKey is the context key under which the route label is stored for promhttp to pick up.
+type routeCtxKey struct{}
+
+// InstrumentHTTP uses promhttp to instrument a handler with total and duration of requests, labeled by status code,
+// method, and route. The route function must map a request to a bounded set of route labels (e.g. mux patterns, never
+// raw paths) to keep metric cardinality bounded.
+func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler, route func(*http.Request) string) http.Handler {
 	requests := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: metricNs,
@@ -31,7 +42,7 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 			Name:      "requests_total",
 			Help:      "Total number of requests received",
 		},
-		[]string{"code"},
+		[]string{"code", "method", "route"},
 	)
 
 	duration := prometheus.NewHistogramVec(
@@ -42,16 +53,28 @@ func InstrumentHTTP(reg prometheus.Registerer, handler http.Handler) http.Handle
 			Help:      "Duration of requests",
 			Buckets:   prometheus.ExponentialBucketsRange(0.5, 60, 16),
 		},
-		[]string{"code"},
+		[]string{"code", "method", "route"},
 	)
 
 	reg.MustRegister(requests)
 	reg.MustRegister(duration)
 
-	handler = promhttp.InstrumentHandlerCounter(requests, handler)
-	handler = promhttp.InstrumentHandlerDuration(duration, handler)
+	routeLabel := promhttp.WithLabelFromCtx("route", func(ctx context.Context) string {
+		if r, ok := ctx.Value(routeCtxKey{}).(string); ok {
+			return r
+		}
+		return "unknown"
+	})
 
-	return handler
+	handler = promhttp.InstrumentHandlerCounter(requests, handler, routeLabel)
+	handler = promhttp.InstrumentHandlerDuration(duration, handler, routeLabel)
+
+	instrumented := handler
+
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), routeCtxKey{}, route(r))
+		instrumented.ServeHTTP(rw, r.WithContext(ctx))
+	})
 }
 
 func AddVersionMetrics(reg prometheus.Registerer) {
@@ -87,6 +110,12 @@ type SupervisorMetrics struct {
 	// session count: fleet busy-ratio is avg() of this gauge across instances, with no assumption about
 	// per-instance capacity baked into the queries.
 	SessionActive prometheus.Gauge
+	// SessionsCreated counts sessions successfully created.
+	SessionsCreated prometheus.Counter
+	// SessionsTerminated counts sessions terminated, labeled by "reason": "deleted" (explicit delete), "timeout"
+	// (session timeout fired), or "replaced" (killed by a new session). A sustained rate of "timeout" terminations
+	// means clients are not releasing their sessions.
+	SessionsTerminated *prometheus.CounterVec
 	// OOMKills counts the number of times the kernel OOM-killer fired within the container's
 	// cgroup during a Chromium session. A non-zero value indicates that Chromium's multi-process
 	// tree (renderer, GPU process, etc.) exceeded the container memory limit and had one or more
@@ -142,6 +171,26 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 				Help:      "Set to 1 when a session is active, 0 otherwise.",
 			},
 		),
+		SessionsCreated: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "sessions_created_total",
+				Help:      "Total number of sessions created.",
+			},
+		),
+		SessionsTerminated: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: metricNs,
+				Subsystem: metricSubsystemCrocochrome,
+				Name:      "sessions_terminated_total",
+				Help: "Total number of sessions terminated, labeled by \"reason\". " +
+					"\"deleted\" means the session was explicitly deleted by a client. " +
+					"\"timeout\" means the session timeout fired. " +
+					"\"replaced\" means the session was killed by the creation of a new one.",
+			},
+			[]string{TerminationReason},
+		),
 		OOMKills: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Namespace: metricNs,
@@ -158,6 +207,8 @@ func Supervisor(reg prometheus.Registerer) *SupervisorMetrics {
 	reg.MustRegister(m.ChromiumExecutions)
 	reg.MustRegister(m.ChromiumResources)
 	reg.MustRegister(m.SessionActive)
+	reg.MustRegister(m.SessionsCreated)
+	reg.MustRegister(m.SessionsTerminated)
 	reg.MustRegister(m.OOMKills)
 
 	return m

@@ -19,6 +19,12 @@ import (
 	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+// terminatedMetricHeader is the HELP/TYPE preamble of the sessions terminated counter, shared by expectations that
+// differ only in the series they assert.
+const terminatedMetricHeader = `# HELP sm_crocochrome_sessions_terminated_total Total number of sessions terminated, labeled by "reason". "deleted" means the session was explicitly deleted by a client. "timeout" means the session timeout fired. "replaced" means the session was killed by the creation of a new one.
+# TYPE sm_crocochrome_sessions_terminated_total counter
+`
+
 func TestCrocochrome(t *testing.T) {
 	t.Parallel()
 
@@ -349,6 +355,75 @@ func TestCrocochrome(t *testing.T) {
 		time.Sleep(4 * time.Second)
 
 		assertSessionActive(t, reg, 0)
+	})
+
+	t.Run("counts created and terminated sessions by reason", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+
+		if _, err := cc.Create(crocochrome.CheckInfo{}); err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		// Second create kills the first session (reason "replaced").
+		sess2, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating second session: %v", err)
+		}
+
+		cc.Delete(sess2.ID)
+
+		wantCreated := `# HELP sm_crocochrome_sessions_created_total Total number of sessions created.
+# TYPE sm_crocochrome_sessions_created_total counter
+sm_crocochrome_sessions_created_total 2
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantCreated),
+			"sm_crocochrome_sessions_created_total"); err != nil {
+			t.Errorf("sessions created counter mismatch: %v", err)
+		}
+
+		wantTerminated := terminatedMetricHeader + `sm_crocochrome_sessions_terminated_total{reason="deleted"} 1
+sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantTerminated),
+			"sm_crocochrome_sessions_terminated_total"); err != nil {
+			t.Errorf("sessions terminated counter mismatch: %v", err)
+		}
+	})
+
+	t.Run("counts a session reaped by the timeout with reason timeout", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:   hb.Path,
+			ChromiumPort:   port,
+			SessionTimeout: 3 * time.Second,
+			Registry:       reg,
+		})
+
+		_, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		time.Sleep(4 * time.Second)
+
+		// Only the "timeout" series must exist: the timeout path must not be double counted as "deleted".
+		wantTerminated := terminatedMetricHeader + `sm_crocochrome_sessions_terminated_total{reason="timeout"} 1
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantTerminated),
+			"sm_crocochrome_sessions_terminated_total"); err != nil {
+			t.Errorf("sessions terminated counter mismatch: %v", err)
+		}
 	})
 
 	t.Run("SessionTimeout returns the resolved timeout", func(t *testing.T) {

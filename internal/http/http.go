@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/grafana/crocochrome/internal/crocochrome"
 	"github.com/koding/websocketproxy"
@@ -39,6 +40,24 @@ func New(logger *slog.Logger, supervisor *crocochrome.Supervisor) *Server {
 func (s *Server) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	s.logger.Debug("handling request", "method", r.Method, "path", r.URL.Path)
 	s.mux.ServeHTTP(rw, r)
+}
+
+// Route maps a request to its route pattern, for use as a metric label. It returns a bounded set of values so that
+// path parameters such as session IDs do not create unbounded metric cardinality.
+func Route(r *http.Request) string {
+	path := r.URL.Path
+	switch {
+	case path == "/sessions":
+		return "/sessions"
+	case path == "/sessions/acquire":
+		return "/sessions/acquire"
+	case strings.HasPrefix(path, "/sessions/"):
+		return "/sessions/{id}"
+	case strings.HasPrefix(path, "/proxy/"):
+		return "/proxy/{id}"
+	default:
+		return "unknown"
+	}
 }
 
 func (s *Server) List(rw http.ResponseWriter, r *http.Request) {

@@ -258,11 +258,12 @@ func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, erro
 	// exist.
 	context.AfterFunc(ctx, func() {
 		// The session context may be cancelled by calling s.Delete, but may also timeout naturally. This function calls
-		// s.Delete to ensure we remove the session from the map on the natural timeout case, which means that s.Delete
-		// will be called a second time by this function if called manually. This is fine, as s.Delete is a no-op if the
-		// session has already been removed.
+		// s.deleteWithReason to ensure we remove the session from the map on the natural timeout case, which means it
+		// will run a second time if s.Delete is called manually. This is fine, as the deletion is a no-op if the
+		// session has already been removed — and only the path that finds the session counts the termination, so the
+		// "timeout" reason is recorded only when the deadline fired before an explicit delete.
 		logger.Debug("context cancelled, removing session from the map")
-		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
+		s.deleteWithReason(id, metrics.TerminationReasonTimeout) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
@@ -321,7 +322,12 @@ func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, erro
 // emitTeardownObservability reads during this window and treats ENOENT (process exited
 // before read) as an expected race, skipping silently.
 func (s *Supervisor) Delete(sessionID string) bool {
-	sess, found := s.takeSession(sessionID)
+	return s.deleteWithReason(sessionID, metrics.TerminationReasonDeleted)
+}
+
+// deleteWithReason implements Delete, recording the termination with the given reason if the session existed.
+func (s *Supervisor) deleteWithReason(sessionID, reason string) bool {
+	sess, found := s.takeSession(sessionID, reason)
 	if !found {
 		return false
 	}
@@ -335,7 +341,8 @@ func (s *Supervisor) Delete(sessionID string) bool {
 // SIGKILL to Chromium), and returns the session. Both operations happen under the same
 // lock so no caller can observe the session gone from the map without SIGKILL already
 // having been sent. Returns (session{}, false) if no session with that ID exists.
-func (s *Supervisor) takeSession(sessionID string) (session, bool) {
+// The termination is recorded with the given reason.
+func (s *Supervisor) takeSession(sessionID, reason string) (session, bool) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -345,7 +352,7 @@ func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	}
 
 	delete(s.sessions, sessionID)
-	s.setSessionInactive()
+	s.setSessionInactive(reason)
 	sess.cancel()
 
 	return sess, true
@@ -402,13 +409,14 @@ func (s *Supervisor) SessionTimeout() time.Duration {
 }
 
 // delete cancels a session's context and removes it from the map, without locking the mutex.
-// It must be used only inside functions that already grab the lock.
+// It must be used only inside functions that already grab the lock. It is only reached from killExisting, hence the
+// "replaced" termination reason.
 func (s *Supervisor) delete(sessionID string) bool {
 	if sess, found := s.sessions[sessionID]; found {
 		s.logger.Debug("cancelling context and deleting session", "sessionID", sessionID)
 		sess.cancel()
 		delete(s.sessions, sessionID)
-		s.setSessionInactive()
+		s.setSessionInactive(metrics.TerminationReasonReplaced)
 		return true
 	}
 
@@ -424,16 +432,21 @@ func (s *Supervisor) killExisting() {
 	}
 }
 
-// setSessionActive records that a session is now active.
+// setSessionActive records that a session is now active, counting it as created.
 // Under the one-session model, session creation and removal map directly to
-// the active/inactive transitions.
+// the active/inactive transitions, so the gauge and the lifecycle counters are
+// two views of the same event and are updated together.
 func (s *Supervisor) setSessionActive() {
 	s.metrics.SessionActive.Set(1)
+	s.metrics.SessionsCreated.Inc()
 }
 
-// setSessionInactive records that no session is active.
-func (s *Supervisor) setSessionInactive() {
+// setSessionInactive records that no session is active, counting the termination with the given reason.
+func (s *Supervisor) setSessionInactive(reason string) {
 	s.metrics.SessionActive.Set(0)
+	s.metrics.SessionsTerminated.With(prometheus.Labels{
+		metrics.TerminationReason: reason,
+	}).Inc()
 }
 
 // launch prepares the requires directories and launches chromium, blocking
