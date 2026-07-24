@@ -293,6 +293,20 @@ func TestCrocochrome(t *testing.T) {
 		hb.AssertAliveDead(0, 1)
 	})
 
+	t.Run("SessionTimeout returns the resolved timeout", func(t *testing.T) {
+		t.Parallel()
+
+		cc := crocochrome.New(logger, crocochrome.Options{SessionTimeout: 42 * time.Second})
+		if got := cc.SessionTimeout(); got != 42*time.Second {
+			t.Fatalf("expected configured timeout 42s, got %v", got)
+		}
+
+		cc = crocochrome.New(logger, crocochrome.Options{})
+		if got := cc.SessionTimeout(); got != 5*time.Minute {
+			t.Fatalf("expected default timeout 5m, got %v", got)
+		}
+	})
+
 	t.Run("creates a session with nil metadata", func(t *testing.T) {
 		t.Parallel()
 

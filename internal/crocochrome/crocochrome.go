@@ -393,6 +393,11 @@ func (s *Supervisor) Wait() {
 	s.wg.Wait()
 }
 
+// SessionTimeout returns the maximum time a session is allowed to run, after which it is killed unconditionally.
+func (s *Supervisor) SessionTimeout() time.Duration {
+	return s.opts.SessionTimeout
+}
+
 // delete cancels a session's context and removes it from the map, without locking the mutex.
 // It must be used only inside functions that already grab the lock.
 func (s *Supervisor) delete(sessionID string) bool {
