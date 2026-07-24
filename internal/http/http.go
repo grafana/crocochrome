@@ -79,6 +79,11 @@ func (s *Server) createSession(
 		_, _ = rw.Write([]byte(err.Error()))
 		return
 	}
+	if errors.Is(err, crocochrome.ErrDraining) {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = rw.Write([]byte(err.Error()))
+		return
+	}
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		_, _ = rw.Write([]byte(err.Error()))

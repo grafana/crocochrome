@@ -151,6 +151,58 @@ func TestHTTP(t *testing.T) {
 		}
 	})
 
+	t.Run("returns 503 while draining but allows deleting the existing session", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+
+		cc.Drain()
+
+		for _, path := range []string{"/sessions", "/sessions/acquire"} {
+			createResp, err := http.Post(server.URL+path, "", nil)
+			if err != nil {
+				t.Fatalf("making request to %s: %v", path, err)
+			}
+			createResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+			if createResp.StatusCode != http.StatusServiceUnavailable {
+				t.Fatalf("expected status %d from %s, got %d", http.StatusServiceUnavailable, path, createResp.StatusCode)
+			}
+		}
+
+		req, err := http.NewRequest(http.MethodDelete, server.URL+"/sessions/"+session.ID, nil)
+		if err != nil {
+			t.Fatalf("building delete request: %v", err)
+		}
+
+		deleteResp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("deleting session: %v", err)
+		}
+		deleteResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if deleteResp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status %d deleting session while draining, got %d", http.StatusOK, deleteResp.StatusCode)
+		}
+	})
+
 	// Regression test for https://github.com/grafana/crocochrome/issues/519.
 	// Chromium 149+ rejects a WS upgrade whose Host header is not an IP or localhost
 	// (DevTools DNS-rebinding protection). The proxy must dial Chromium with the
