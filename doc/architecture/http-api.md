@@ -27,8 +27,10 @@ holds no session state of its own.
 | `Server`                  | `http.go` (`type Server struct`) | holds the logger, the `*crocochrome.Supervisor`, and a `*http.ServeMux` |
 | `New(logger, supervisor)` | `http.go`                        | builds the mux and registers routes; returns `*Server`                  |
 | `(*Server) ServeHTTP`     | `http.go`                        | implements `http.Handler`; logs and delegates to the mux                |
+| `Route`                   | `http.go`                        | maps a request to a bounded route-pattern label for metrics             |
 | `(*Server) List`          | `http.go`                        | `GET /sessions`                                                         |
 | `(*Server) Create`        | `http.go`                        | `POST /sessions`                                                        |
+| `(*Server) Acquire`       | `http.go`                        | `POST /sessions/acquire`                                                |
 | `(*Server) Delete`        | `http.go`                        | `DELETE /sessions/{id}`                                                 |
 | `(*Server) Proxy`         | `http.go`                        | `/proxy/{id}` WebSocket proxy                                           |
 
@@ -38,23 +40,36 @@ syntax — no third-party router:
 ```go
 mux.HandleFunc("GET /sessions", api.List)
 mux.HandleFunc("POST /sessions", api.Create)
+mux.HandleFunc("POST /sessions/acquire", api.Acquire)
 mux.HandleFunc("DELETE /sessions/{id}", api.Delete)
 mux.HandleFunc("/proxy/{id}", api.Proxy)
 ```
 
 ## Routes
 
-| Method   | Path             | Handler  | Success                    | Notable failures                                     |
-|----------|------------------|----------|----------------------------|------------------------------------------------------|
-| `GET`    | `/sessions`      | `List`   | `200` + JSON array of IDs  | —                                                    |
-| `POST`   | `/sessions`      | `Create` | `200` + `SessionInfo` JSON | `500` if Supervisor fails to start Chromium          |
-| `DELETE` | `/sessions/{id}` | `Delete` | `200` (default)            | `400` if ID empty, `404` if not found                |
-| (any)    | `/proxy/{id}`    | `Proxy`  | WS upgrade                 | `400` empty ID, `404` unknown session, `500` bad URL |
+| Method   | Path                | Handler   | Success                    | Notable failures                                                 |
+|----------|---------------------|-----------|----------------------------|------------------------------------------------------------------|
+| `GET`    | `/sessions`         | `List`    | `200` + JSON array of IDs  | —                                                                |
+| `POST`   | `/sessions`         | `Create`  | `200` + `SessionInfo` JSON | `500` Chromium failed to start, `503` draining                   |
+| `POST`   | `/sessions/acquire` | `Acquire` | `200` + `SessionInfo` JSON | `409` session already exists, `500` Chromium, `503` draining     |
+| `DELETE` | `/sessions/{id}`    | `Delete`  | `200` (default)            | `400` if ID empty, `404` if not found                            |
+| (any)    | `/proxy/{id}`       | `Proxy`   | WS upgrade                 | `400` empty ID, `404` unknown session, `500` bad URL             |
+
+`Create` and `Acquire` share one implementation (`createSession`) and differ
+only in conflict behavior: `Create` kills any existing session first (legacy
+semantics), while `Acquire` is **create-if-free** — it never touches a running
+session and responds `409 Conflict` instead. This makes `Acquire` a race-free
+atomic acquire for callers treating the instance as part of a pool of
+single-session browsers. Both respond `503 Service Unavailable` once the
+process is draining (see
+[entrypoint-and-lifecycle.md](entrypoint-and-lifecycle.md)); a pool client
+treats 503 like 409 — instance not available, try another.
 
 ### Request / response shapes
 
-`POST /sessions` accepts an optional `crocochrome.CheckInfo` body (see
-[supervisor.md](supervisor.md)):
+`POST /sessions` and `POST /sessions/acquire` accept the same optional
+`crocochrome.CheckInfo` body (see [supervisor.md](supervisor.md)) and return
+the same response shape:
 
 ```json
 { "type": "browser", "metadata": { "regionID": "...", "tenantID": "...", "id": "..." } }
@@ -143,8 +158,12 @@ sequenceDiagram
 
 The handler returned by `New` is wrapped by `metrics.InstrumentHTTP` in
 `main.go`, which records `sm_crocochrome_requests_total` and
-`sm_crocochrome_request_duration_seconds`, both labeled by HTTP status `code`.
-`ServeHTTP` also emits a debug log line per request. See
+`sm_crocochrome_request_duration_seconds`, labeled by HTTP status `code`,
+`method`, and `route`. The `route` label comes from this package's `Route`
+function, which maps requests to a bounded set of route patterns
+(`/sessions`, `/sessions/acquire`, `/sessions/{id}`, `/proxy/{id}`,
+`unknown`) — never raw paths, so session IDs cannot create unbounded metric
+cardinality. `ServeHTTP` also emits a debug log line per request. See
 [observability.md](observability.md).
 
 ## When to update
