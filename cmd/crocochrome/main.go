@@ -114,6 +114,10 @@ func run(logger *slog.Logger, config *Config) error {
 		// Wait for the main context to get canceled. This will typically happen when we receive a signal.
 		<-ctx.Done()
 
+		// Stop accepting new sessions before waiting for existing ones, so the session count can only decrease
+		// from this point on.
+		supervisor.Drain()
+
 		graceCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), graceTime)
 		defer cancelShutdown()
 

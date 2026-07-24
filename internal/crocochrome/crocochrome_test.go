@@ -260,6 +260,39 @@ func TestCrocochrome(t *testing.T) {
 		hb.AssertAliveDead(1, 0)
 	})
 
+	t.Run("Drain rejects new sessions but preserves the existing one", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		cc.Drain()
+
+		if _, err := cc.Create(crocochrome.CheckInfo{}); !errors.Is(err, crocochrome.ErrDraining) {
+			t.Fatalf("expected ErrDraining from Create, got: %v", err)
+		}
+
+		if _, err := cc.CreateIfFree(crocochrome.CheckInfo{}); !errors.Is(err, crocochrome.ErrDraining) {
+			t.Fatalf("expected ErrDraining from CreateIfFree, got: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if !cc.Delete(sess.ID) {
+			t.Fatalf("expected session %q to be deletable while draining", sess.ID)
+		}
+
+		hb.AssertAliveDead(0, 1)
+	})
+
 	t.Run("creates a session with nil metadata", func(t *testing.T) {
 		t.Parallel()
 

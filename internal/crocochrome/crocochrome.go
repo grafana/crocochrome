@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,8 +24,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// ErrSessionExists is returned by CreateIfFree when a session is already active.
-var ErrSessionExists = errors.New("a session already exists")
+var (
+	// ErrSessionExists is returned by CreateIfFree when a session is already active.
+	ErrSessionExists = errors.New("a session already exists")
+
+	// ErrDraining is returned by Create and CreateIfFree after Drain has been called.
+	ErrDraining = errors.New("shutting down, not accepting new sessions")
+)
 
 type Supervisor struct {
 	opts    Options
@@ -46,6 +52,9 @@ type Supervisor struct {
 	// wg stores a WaitGroup. This WaitGroup is used to track the number of open sessions, and Supervisor.Wait relies on
 	// it to work.
 	wg *sync.WaitGroup
+	// draining, when set, makes session creation fail with ErrDraining. Existing sessions are unaffected. It is set by
+	// Drain during graceful shutdown and never unset.
+	draining atomic.Bool
 }
 
 type Options struct {
@@ -210,6 +219,10 @@ func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, erro
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
+	if s.draining.Load() {
+		return SessionInfo{}, ErrDraining
+	}
+
 	if ifFree && len(s.sessions) > 0 {
 		return SessionInfo{}, ErrSessionExists
 	}
@@ -366,6 +379,13 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 		slog.Int64("cgroupRSS", cgroupRSS),
 		slog.Int("processCount", len(processes)),
 	)
+}
+
+// Drain makes all subsequent session creations fail with ErrDraining. Existing sessions are unaffected: they can
+// still be deleted, proxied to, and will time out normally. Once draining, the session count can only decrease, so
+// Wait is guaranteed to return within the session timeout.
+func (s *Supervisor) Drain() {
+	s.draining.Store(true)
 }
 
 // Wait blocks until there are no sessions running.
