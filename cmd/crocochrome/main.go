@@ -109,7 +109,17 @@ func run(logger *slog.Logger, config *Config) error {
 	})
 
 	eg.Go(func() error {
-		const graceTime = 2 * time.Minute
+		// graceTime bounds how long we wait for the active session after draining. Once draining, a session's
+		// remaining lifetime is capped by its own timeout, so SessionTimeout plus a teardown margin is sufficient
+		// by construction.
+		// This value has implications outside the crocochrome implementation itself: the environment must allow
+		// the process at least graceTime + httpShutdownGraceTime to shut down after SIGTERM. On Kubernetes, that
+		// means terminationGracePeriodSeconds >= graceTime + httpShutdownGraceTime (~360s with the default 5m
+		// session timeout); the k8s default of 30s would SIGKILL the process long before this grace elapses.
+		graceTime := supervisor.SessionTimeout() + 30*time.Second
+		// httpShutdownGraceTime bounds flushing in-flight HTTP requests after all sessions have ended, which is
+		// unrelated to session lifetime.
+		const httpShutdownGraceTime = 10 * time.Second
 
 		// Wait for the main context to get canceled. This will typically happen when we receive a signal.
 		<-ctx.Done()
@@ -135,13 +145,12 @@ func run(logger *slog.Logger, config *Config) error {
 		case <-waitCh:
 		}
 
-		// Shut down the HTTP server _after_ all sessions are terminated, and not before. By doing it in this order,
-		// there's a chance of a new session being created just before we stop the server, but if we did it the other
-		// way around, we wouldn't give clients the ability to terminate them altogether.
+		// Shut down the HTTP server _after_ all sessions are terminated, and not before, so clients keep the
+		// ability to terminate them during the drain.
 
-		logger.Warn("Existing sessions terminated, shutting down HTTP server", "graceTime", graceTime)
+		logger.Warn("Existing sessions terminated, shutting down HTTP server", "httpShutdownGrace", httpShutdownGraceTime)
 
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), graceTime)
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), httpShutdownGraceTime)
 		defer cancelShutdown()
 
 		return server.Shutdown(shutdownCtx)
