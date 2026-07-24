@@ -73,6 +73,84 @@ func TestHTTP(t *testing.T) {
 		}
 	})
 
+	t.Run("acquire creates a session when free", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions/acquire", "", nil)
+		if err != nil {
+			t.Fatalf("making request: %v", err)
+		}
+
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+		}
+
+		var response struct {
+			ID              string `json:"ID"`
+			ChromiumVersion struct {
+				WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+			} `json:"chromiumVersion"`
+		}
+
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		if err != nil {
+			t.Fatalf("decoding response: %v", err)
+		}
+
+		if response.ID == "" {
+			t.Fatalf("session ID is empty")
+		}
+
+		if response.ChromiumVersion.WebSocketDebuggerURL == "" {
+			t.Fatalf("webSocketDebuggerUrl is unexpectedly empty")
+		}
+	})
+
+	t.Run("acquire returns 409 when busy and keeps the existing session", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+
+		acquireResp, err := http.Post(server.URL+"/sessions/acquire", "", nil)
+		if err != nil {
+			t.Fatalf("making acquire request: %v", err)
+		}
+		defer acquireResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if acquireResp.StatusCode != http.StatusConflict {
+			t.Fatalf("expected status %d, got %d", http.StatusConflict, acquireResp.StatusCode)
+		}
+
+		if list := cc.Sessions(); len(list) != 1 || list[0] != session.ID {
+			t.Fatalf("expected sessions list to contain only %q, got %v", session.ID, list)
+		}
+	})
+
 	// Regression test for https://github.com/grafana/crocochrome/issues/519.
 	// Chromium 149+ rejects a WS upgrade whose Host header is not an IP or localhost
 	// (DevTools DNS-rebinding protection). The proxy must dial Chromium with the
