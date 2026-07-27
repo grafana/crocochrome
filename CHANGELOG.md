@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.6](https://github.com/grafana/crocochrome/compare/v0.12.5...v0.12.6) (2026-07-23)
+
+
+### Miscellaneous Chores
+
+* Update actions/checkout action to v7.0.1 ([#527](https://github.com/grafana/crocochrome/issues/527)) ([da35d26](https://github.com/grafana/crocochrome/commit/da35d268b1140e4bdee5e125a4b1632be007c0cc))
+* Update actions/checkout digest to 3d3c42e ([#522](https://github.com/grafana/crocochrome/issues/522)) ([4414f73](https://github.com/grafana/crocochrome/commit/4414f73aa412d7bede80cf912e62bbbcce7d9379))
+* Update docker/login-action digest to 06fb636 ([#526](https://github.com/grafana/crocochrome/issues/526)) ([3bed8fa](https://github.com/grafana/crocochrome/commit/3bed8faa203ecb929aa45c52cf12c29a2ed31807))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to 216a193 ([#524](https://github.com/grafana/crocochrome/issues/524)) ([a5e68c9](https://github.com/grafana/crocochrome/commit/a5e68c966eaafc666b5d70ce82a3c5f8e1e775ca))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to 23f3e68 ([#528](https://github.com/grafana/crocochrome/issues/528)) ([053fbf0](https://github.com/grafana/crocochrome/commit/053fbf0865fd9eb4655643ec55a8eebd5338a548))
+* Update module github.com/prometheus/client_golang to v1.24.0 ([#525](https://github.com/grafana/crocochrome/issues/525)) ([babb306](https://github.com/grafana/crocochrome/commit/babb30612ee852b8cecb4efce9c03cb4fdff34e6))
+
 ## [0.12.5](https://github.com/grafana/crocochrome/compare/v0.12.4...v0.12.5) (2026-07-20)
 
 
