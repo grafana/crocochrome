@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.7](https://github.com/grafana/crocochrome/compare/v0.12.6...v0.12.7) (2026-07-30)
+
+
+### Miscellaneous Chores
+
+* Update docker/login-action digest to 371161b ([#529](https://github.com/grafana/crocochrome/issues/529)) ([6735172](https://github.com/grafana/crocochrome/commit/6735172864a08948b1e236eebe80e299492cc247))
+* Update docker/login-action digest to dbcb813 ([#535](https://github.com/grafana/crocochrome/issues/535)) ([5746a4e](https://github.com/grafana/crocochrome/commit/5746a4e69b031a01cdcbc3beec50e8d4c56f6e5b))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:149.0.7827.53-r0-3.23.4 Docker digest to 9f1c9c4 ([#534](https://github.com/grafana/crocochrome/issues/534)) ([7442ff1](https://github.com/grafana/crocochrome/commit/7442ff16299e668be42d92337a5bcc35614d1383))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.44.0 ([#533](https://github.com/grafana/crocochrome/issues/533)) ([1434d95](https://github.com/grafana/crocochrome/commit/1434d955019976c880f0b7d7728b476ba4be49c1))
+* Update module github.com/prometheus/client_golang to v1.24.1 ([#531](https://github.com/grafana/crocochrome/issues/531)) ([5cfec97](https://github.com/grafana/crocochrome/commit/5cfec97513b2808fac085861907acf233ccce45c))
+* Update module go.opentelemetry.io/otel to v1.44.0 [SECURITY] ([#530](https://github.com/grafana/crocochrome/issues/530)) ([2e376ac](https://github.com/grafana/crocochrome/commit/2e376accd7c2c819f5ab72c7eff564ee710ac57c))
+
 ## [0.12.6](https://github.com/grafana/crocochrome/compare/v0.12.5...v0.12.6) (2026-07-23)
 
 
