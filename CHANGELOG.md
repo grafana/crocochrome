@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.9](https://github.com/grafana/crocochrome/compare/v0.12.8...v0.12.9) (2026-09-07)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-buildx-action digest to 37fe631 ([#542](https://github.com/grafana/crocochrome/issues/542)) ([21a3698](https://github.com/grafana/crocochrome/commit/21a3698c26841b4278053363cd177fc5bd6d1686))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v151 ([#543](https://github.com/grafana/crocochrome/issues/543)) ([4446d7a](https://github.com/grafana/crocochrome/commit/4446d7ae0fbd041424f251f3eb2b4d5abbd421d4))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:151.0.7922.173-r0-3.24.1 Docker digest to 1f35883 ([#547](https://github.com/grafana/crocochrome/issues/547)) ([65e521c](https://github.com/grafana/crocochrome/commit/65e521c0d80402543365b9a4d91c209f35b5e28f))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.47.0 ([#545](https://github.com/grafana/crocochrome/issues/545)) ([dfd708b](https://github.com/grafana/crocochrome/commit/dfd708bd01cdaea46af5f4ef07b8bf1849f46cd0))
+* Update grafana/k6-v1 Docker tag to v1.8.1 ([#540](https://github.com/grafana/crocochrome/issues/540)) ([089ef67](https://github.com/grafana/crocochrome/commit/089ef676751a099374fc3de53323f40cafdcc89d))
+* Update grafana/k6-v2 Docker tag to v2.2.0 ([#539](https://github.com/grafana/crocochrome/issues/539)) ([2b88e08](https://github.com/grafana/crocochrome/commit/2b88e088ba8c302197484d24b78969698f3bd4de))
+* Update module github.com/moby/go-archive to v0.3.0 [SECURITY] ([#541](https://github.com/grafana/crocochrome/issues/541)) ([5a57581](https://github.com/grafana/crocochrome/commit/5a57581b8529aa0fed5c0f33dcf83303fa9321c7))
+* Update module github.com/moby/moby/api to v1.56.0 ([#552](https://github.com/grafana/crocochrome/issues/552)) ([b93baf6](https://github.com/grafana/crocochrome/commit/b93baf65305b9cf89b527d48661228df1826847c))
+* Update module github.com/prometheus/procfs to v0.22.0 ([#550](https://github.com/grafana/crocochrome/issues/550)) ([3cd1645](https://github.com/grafana/crocochrome/commit/3cd16451bfb4ecb04b316de62f4be7bc834668a7))
+* Update module github.com/testcontainers/testcontainers-go to v0.44.0 ([#537](https://github.com/grafana/crocochrome/issues/537)) ([0938a0d](https://github.com/grafana/crocochrome/commit/0938a0dd55a7410a33b20e3b5dbab4835b2f41cd))
+* Update module golang.org/x/crypto to v0.56.0 [SECURITY] ([#549](https://github.com/grafana/crocochrome/issues/549)) ([6c86d79](https://github.com/grafana/crocochrome/commit/6c86d791906fb0cb8e70a6a2316ee168db929169))
+
 ## [0.12.8](https://github.com/grafana/crocochrome/compare/v0.12.7...v0.12.8) (2026-08-22)
 
 
