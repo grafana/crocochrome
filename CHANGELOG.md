@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.12.10](https://github.com/grafana/crocochrome/compare/v0.12.9...v0.12.10) (2026-09-09)
+
+
+### Miscellaneous Chores
+
+* Update docker/setup-qemu-action digest to 1f40c72 ([#551](https://github.com/grafana/crocochrome/issues/551)) ([cb79f1a](https://github.com/grafana/crocochrome/commit/cb79f1a3a35354f0d28739daf76a2b90d625d6ac))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v152 ([#553](https://github.com/grafana/crocochrome/issues/553)) ([2e18d55](https://github.com/grafana/crocochrome/commit/2e18d555469f91a66b884cd77921a5c0627ee623))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:152.0.7977.82-r0-3.24.1 Docker digest to eea17bd ([#556](https://github.com/grafana/crocochrome/issues/556)) ([3229964](https://github.com/grafana/crocochrome/commit/32299646b847a5e0dca777929976ee5c93825b40))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.47.1 ([#557](https://github.com/grafana/crocochrome/issues/557)) ([57963bf](https://github.com/grafana/crocochrome/commit/57963bfcc44502772d8a45d791ea8181367c982a))
+* Update module golang.org/x/sync to v0.23.0 ([#554](https://github.com/grafana/crocochrome/issues/554)) ([a705e9a](https://github.com/grafana/crocochrome/commit/a705e9a92fe53df645d42e97dcce14ad74d923f1))
+
 ## [0.12.9](https://github.com/grafana/crocochrome/compare/v0.12.8...v0.12.9) (2026-09-07)
 
 
