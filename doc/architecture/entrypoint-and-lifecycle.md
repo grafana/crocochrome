@@ -78,7 +78,8 @@ sequenceDiagram
     main->>srv: ListenAndServe() on :8080 (goroutine A)
     Note over main: goroutine B waits on signal ctx
     OS-->>main: SIGINT / SIGTERM / SIGHUP
-    main->>sup: Wait() (up to 2m grace)
+    main->>sup: Drain() (creations now fail with 503)
+    main->>sup: Wait() (grace = SessionTimeout + 30s)
     sup-->>main: all sessions finished
     main->>srv: Shutdown(ctx)
     srv-->>main: closed
@@ -97,21 +98,36 @@ under an `errgroup`:
   cleanly it returns `http.ErrServerClosed`, which is treated as a non-error
   (returns `nil`).
 - **Goroutine B** waits for the context to be cancelled (a signal), then:
-  1. Builds a `graceCtx` with a **2-minute** grace timeout
-     (`const graceTime = 2 * time.Minute`), derived from
-     `context.WithoutCancel(ctx)` so the already-cancelled signal context does
-     not immediately abort it.
-  2. Calls `supervisor.Wait()` in a goroutine and waits for either that to
+  1. Calls `supervisor.Drain()`, so all subsequent session creations fail
+     (the HTTP layer maps this to `503 Service Unavailable`). Existing
+     sessions are unaffected. From this point the session count can only
+     decrease.
+  2. Builds a `graceCtx` with a grace timeout **derived from the session
+     timeout**: `graceTime := supervisor.SessionTimeout() + 30*time.Second`,
+     using `context.WithoutCancel(ctx)` so the already-cancelled signal
+     context does not immediately abort it. Because draining bounds the
+     active session's remaining lifetime by its own timeout, this grace is
+     sufficient by construction; the 30s margin covers post-kill teardown.
+  3. Calls `supervisor.Wait()` in a goroutine and waits for either that to
      finish or the grace timeout to elapse.
-  3. **Only then** calls `server.Shutdown()`.
+  4. **Only then** calls `server.Shutdown()`, with its own short bound
+     (`const httpShutdownGraceTime = 10 * time.Second`) — flushing in-flight
+     HTTP requests is unrelated to session lifetime.
+
+The grace derivation has implications **outside this binary**: the
+environment must allow the process at least
+`graceTime + httpShutdownGraceTime` to shut down after SIGTERM. On
+Kubernetes, `terminationGracePeriodSeconds` must be at least that (~360s with
+the default 5m session timeout); the Kubernetes default of 30s would SIGKILL
+the process long before the grace elapses.
 
 ### Why shut down the HTTP server _after_ draining sessions
 
 The ordering is deliberate (see the comment in `run`): if the server stopped
 listening first, clients would lose the ability to `DELETE` their lingering
 sessions. By draining sessions first, in-flight checks get a chance to finish and
-clean up. The trade-off — a new session could be created in the small window
-before the server stops — is accepted.
+clean up. `Drain()` closes what used to be an accepted race here: new sessions
+can no longer be created in the window before the server stops.
 
 `context.WithoutCancel` is used for both the grace and shutdown contexts so that
 the cancellation that _triggered_ shutdown does not also cancel the shutdown
@@ -122,7 +138,9 @@ work itself.
 - A flag is added/removed/renamed, or a default changes → update the flags table.
 - The listen address, Chromium binary name, or `ExtraUATerms` stops being
   hardcoded or changes value → update the "Configuration" section.
-- The grace period (`graceTime`) changes → update the graceful-shutdown section.
+- The grace derivation (`SessionTimeout + margin`) or the HTTP shutdown bound
+  changes → update the graceful-shutdown section, including the
+  `terminationGracePeriodSeconds` guidance.
 - The shutdown ordering (drain-then-close) changes → revise the "Why shut down
   the HTTP server after draining sessions" section, as this is a deliberate
   design decision others may rely on.

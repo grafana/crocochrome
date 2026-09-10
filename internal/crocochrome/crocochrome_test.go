@@ -2,11 +2,14 @@ package crocochrome_test
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +18,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 )
+
+// terminatedMetricHeader is the HELP/TYPE preamble of the sessions terminated counter, shared by expectations that
+// differ only in the series they assert.
+const terminatedMetricHeader = `# HELP sm_crocochrome_sessions_terminated_total Total number of sessions terminated, labeled by "reason". "deleted" means the session was explicitly deleted by a client. "timeout" means the session timeout fired. "replaced" means the session was killed by the creation of a new one.
+# TYPE sm_crocochrome_sessions_terminated_total counter
+`
 
 func TestCrocochrome(t *testing.T) {
 	t.Parallel()
@@ -144,6 +153,291 @@ func TestCrocochrome(t *testing.T) {
 				t.Fatalf("session list %v should not contain terminated session %q", list, sess1.ID)
 			}
 		})
+	})
+
+	t.Run("CreateIfFree creates a session when free", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		session, err := cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if list := cc.Sessions(); !slices.Contains(list, session.ID) {
+			t.Fatalf("session ID %q not found in sessions list %v", session.ID, list)
+		}
+	})
+
+	t.Run("CreateIfFree does not terminate an existing session", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess1, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		_, err = cc.CreateIfFree(crocochrome.CheckInfo{})
+		if !errors.Is(err, crocochrome.ErrSessionExists) {
+			t.Fatalf("expected ErrSessionExists, got: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if list := cc.Sessions(); len(list) != 1 || !slices.Contains(list, sess1.ID) {
+			t.Fatalf("expected sessions list to contain only %q, got %v", sess1.ID, list)
+		}
+	})
+
+	t.Run("CreateIfFree succeeds after the session is deleted", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess, err := cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		cc.Delete(sess.ID)
+
+		_, err = cc.CreateIfFree(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session after delete: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 1)
+	})
+
+	t.Run("concurrent CreateIfFree yields exactly one session", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		const concurrency = 10
+
+		errs := make([]error, concurrency)
+		var wg sync.WaitGroup
+		for i := range concurrency {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, errs[i] = cc.CreateIfFree(crocochrome.CheckInfo{})
+			}()
+		}
+		wg.Wait()
+
+		var successes, conflicts int
+		for _, err := range errs {
+			switch {
+			case err == nil:
+				successes++
+			case errors.Is(err, crocochrome.ErrSessionExists):
+				conflicts++
+			default:
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+
+		if successes != 1 || conflicts != concurrency-1 {
+			t.Fatalf("expected 1 success and %d conflicts, got %d and %d", concurrency-1, successes, conflicts)
+		}
+
+		if list := cc.Sessions(); len(list) != 1 {
+			t.Fatalf("expected exactly one session, got %v", list)
+		}
+
+		hb.AssertAliveDead(1, 0)
+	})
+
+	t.Run("Drain rejects new sessions but preserves the existing one", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		cc.Drain()
+
+		if _, err := cc.Create(crocochrome.CheckInfo{}); !errors.Is(err, crocochrome.ErrDraining) {
+			t.Fatalf("expected ErrDraining from Create, got: %v", err)
+		}
+
+		if _, err := cc.CreateIfFree(crocochrome.CheckInfo{}); !errors.Is(err, crocochrome.ErrDraining) {
+			t.Fatalf("expected ErrDraining from CreateIfFree, got: %v", err)
+		}
+
+		hb.AssertAliveDead(1, 0)
+
+		if !cc.Delete(sess.ID) {
+			t.Fatalf("expected session %q to be deletable while draining", sess.ID)
+		}
+
+		hb.AssertAliveDead(0, 1)
+	})
+
+	t.Run("tracks active sessions in a gauge", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+
+		assertSessionActive(t, reg, 0)
+
+		sess, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		// Replacing the session via kill-existing keeps the gauge at 1.
+		sess, err = cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating second session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		cc.Delete(sess.ID)
+
+		assertSessionActive(t, reg, 0)
+	})
+
+	t.Run("clears the active sessions gauge when a session times out", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:   hb.Path,
+			ChromiumPort:   port,
+			SessionTimeout: 3 * time.Second,
+			Registry:       reg,
+		})
+
+		_, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		assertSessionActive(t, reg, 1)
+
+		time.Sleep(4 * time.Second)
+
+		assertSessionActive(t, reg, 0)
+	})
+
+	t.Run("counts created and terminated sessions by reason", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+
+		if _, err := cc.Create(crocochrome.CheckInfo{}); err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		// Second create kills the first session (reason "replaced").
+		sess2, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating second session: %v", err)
+		}
+
+		cc.Delete(sess2.ID)
+
+		wantCreated := `# HELP sm_crocochrome_sessions_created_total Total number of sessions created.
+# TYPE sm_crocochrome_sessions_created_total counter
+sm_crocochrome_sessions_created_total 2
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantCreated),
+			"sm_crocochrome_sessions_created_total"); err != nil {
+			t.Errorf("sessions created counter mismatch: %v", err)
+		}
+
+		wantTerminated := terminatedMetricHeader + `sm_crocochrome_sessions_terminated_total{reason="deleted"} 1
+sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantTerminated),
+			"sm_crocochrome_sessions_terminated_total"); err != nil {
+			t.Errorf("sessions terminated counter mismatch: %v", err)
+		}
+	})
+
+	t.Run("counts a session reaped by the timeout with reason timeout", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+
+		reg := prometheus.NewRegistry()
+		cc := crocochrome.New(logger, crocochrome.Options{
+			ChromiumPath:   hb.Path,
+			ChromiumPort:   port,
+			SessionTimeout: 3 * time.Second,
+			Registry:       reg,
+		})
+
+		_, err := cc.Create(crocochrome.CheckInfo{})
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+
+		time.Sleep(4 * time.Second)
+
+		// Only the "timeout" series must exist: the timeout path must not be double counted as "deleted".
+		wantTerminated := terminatedMetricHeader + `sm_crocochrome_sessions_terminated_total{reason="timeout"} 1
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantTerminated),
+			"sm_crocochrome_sessions_terminated_total"); err != nil {
+			t.Errorf("sessions terminated counter mismatch: %v", err)
+		}
+	})
+
+	t.Run("SessionTimeout returns the resolved timeout", func(t *testing.T) {
+		t.Parallel()
+
+		cc := crocochrome.New(logger, crocochrome.Options{SessionTimeout: 42 * time.Second})
+		if got := cc.SessionTimeout(); got != 42*time.Second {
+			t.Fatalf("expected configured timeout 42s, got %v", got)
+		}
+
+		cc = crocochrome.New(logger, crocochrome.Options{})
+		if got := cc.SessionTimeout(); got != 5*time.Minute {
+			t.Fatalf("expected default timeout 5m, got %v", got)
+		}
 	})
 
 	t.Run("creates a session with nil metadata", func(t *testing.T) {
@@ -351,4 +645,18 @@ sm_crocochrome_chromium_oom_kills_total 1
 			}
 		}
 	})
+}
+
+// assertSessionActive checks that the session active gauge in reg has the given value.
+func assertSessionActive(t *testing.T, reg *prometheus.Registry, want float64) {
+	t.Helper()
+
+	wantMetric := fmt.Sprintf(`# HELP sm_crocochrome_session_active Set to 1 when a session is active, 0 otherwise.
+# TYPE sm_crocochrome_session_active gauge
+sm_crocochrome_session_active %g
+`, want)
+	if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantMetric),
+		"sm_crocochrome_session_active"); err != nil {
+		t.Errorf("session active gauge mismatch: %v", err)
+	}
 }

@@ -15,12 +15,21 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/grafana/crocochrome/internal/chromium"
 	"github.com/grafana/crocochrome/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+var (
+	// ErrSessionExists is returned by CreateIfFree when a session is already active.
+	ErrSessionExists = errors.New("a session already exists")
+
+	// ErrDraining is returned by Create and CreateIfFree after Drain has been called.
+	ErrDraining = errors.New("shutting down, not accepting new sessions")
 )
 
 type Supervisor struct {
@@ -43,6 +52,9 @@ type Supervisor struct {
 	// wg stores a WaitGroup. This WaitGroup is used to track the number of open sessions, and Supervisor.Wait relies on
 	// it to work.
 	wg *sync.WaitGroup
+	// draining, when set, makes session creation fail with ErrDraining. Existing sessions are unaffected. It is set by
+	// Drain during graceful shutdown and never unset.
+	draining atomic.Bool
 }
 
 type Options struct {
@@ -192,8 +204,28 @@ func (s *Supervisor) Sessions() []string {
 // behavior and should delete their sessions when they finish. If a session has to be terminated when a new one is
 // created, an error is logged.
 func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
+	return s.create(checkInfo, false)
+}
+
+// CreateIfFree creates a new browser session only if no session is currently active, returning ErrSessionExists
+// otherwise. Unlike Create, it never terminates an existing session.
+func (s *Supervisor) CreateIfFree(checkInfo CheckInfo) (SessionInfo, error) {
+	return s.create(checkInfo, true)
+}
+
+// create creates a new browser session. If ifFree is true and a session already exists, it returns ErrSessionExists;
+// otherwise existing sessions are terminated before creating the new one.
+func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, error) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
+
+	if s.draining.Load() {
+		return SessionInfo{}, ErrDraining
+	}
+
+	if ifFree && len(s.sessions) > 0 {
+		return SessionInfo{}, ErrSessionExists
+	}
 
 	s.killExisting()
 
@@ -226,11 +258,12 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 	// exist.
 	context.AfterFunc(ctx, func() {
 		// The session context may be cancelled by calling s.Delete, but may also timeout naturally. This function calls
-		// s.Delete to ensure we remove the session from the map on the natural timeout case, which means that s.Delete
-		// will be called a second time by this function if called manually. This is fine, as s.Delete is a no-op if the
-		// session has already been removed.
+		// s.deleteWithReason to ensure we remove the session from the map on the natural timeout case, which means it
+		// will run a second time if s.Delete is called manually. This is fine, as the deletion is a no-op if the
+		// session has already been removed — and only the path that finds the session counts the termination, so the
+		// "timeout" reason is recorded only when the deadline fired before an explicit delete.
 		logger.Debug("context cancelled, removing session from the map")
-		s.Delete(id) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
+		s.deleteWithReason(id, metrics.TerminationReasonTimeout) // AfterFunc runs on a separate goroutine, so we want the mutex-locking version.
 	})
 
 	// Launch chromium and wait for it to finish asynchronously.
@@ -268,6 +301,8 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 		logger: logger,
 	}
 
+	s.setSessionActive()
+
 	return si, nil
 }
 
@@ -287,7 +322,12 @@ func (s *Supervisor) Create(checkInfo CheckInfo) (SessionInfo, error) {
 // emitTeardownObservability reads during this window and treats ENOENT (process exited
 // before read) as an expected race, skipping silently.
 func (s *Supervisor) Delete(sessionID string) bool {
-	sess, found := s.takeSession(sessionID)
+	return s.deleteWithReason(sessionID, metrics.TerminationReasonDeleted)
+}
+
+// deleteWithReason implements Delete, recording the termination with the given reason if the session existed.
+func (s *Supervisor) deleteWithReason(sessionID, reason string) bool {
+	sess, found := s.takeSession(sessionID, reason)
 	if !found {
 		return false
 	}
@@ -301,7 +341,8 @@ func (s *Supervisor) Delete(sessionID string) bool {
 // SIGKILL to Chromium), and returns the session. Both operations happen under the same
 // lock so no caller can observe the session gone from the map without SIGKILL already
 // having been sent. Returns (session{}, false) if no session with that ID exists.
-func (s *Supervisor) takeSession(sessionID string) (session, bool) {
+// The termination is recorded with the given reason.
+func (s *Supervisor) takeSession(sessionID, reason string) (session, bool) {
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
@@ -311,6 +352,7 @@ func (s *Supervisor) takeSession(sessionID string) (session, bool) {
 	}
 
 	delete(s.sessions, sessionID)
+	s.setSessionInactive(reason)
 	sess.cancel()
 
 	return sess, true
@@ -349,18 +391,32 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 	)
 }
 
+// Drain makes all subsequent session creations fail with ErrDraining. Existing sessions are unaffected: they can
+// still be deleted, proxied to, and will time out normally. Once draining, the session count can only decrease, so
+// Wait is guaranteed to return within the session timeout.
+func (s *Supervisor) Drain() {
+	s.draining.Store(true)
+}
+
 // Wait blocks until there are no sessions running.
 func (s *Supervisor) Wait() {
 	s.wg.Wait()
 }
 
+// SessionTimeout returns the maximum time a session is allowed to run, after which it is killed unconditionally.
+func (s *Supervisor) SessionTimeout() time.Duration {
+	return s.opts.SessionTimeout
+}
+
 // delete cancels a session's context and removes it from the map, without locking the mutex.
-// It must be used only inside functions that already grab the lock.
+// It must be used only inside functions that already grab the lock. It is only reached from killExisting, hence the
+// "replaced" termination reason.
 func (s *Supervisor) delete(sessionID string) bool {
 	if sess, found := s.sessions[sessionID]; found {
 		s.logger.Debug("cancelling context and deleting session", "sessionID", sessionID)
 		sess.cancel()
 		delete(s.sessions, sessionID)
+		s.setSessionInactive(metrics.TerminationReasonReplaced)
 		return true
 	}
 
@@ -374,6 +430,23 @@ func (s *Supervisor) killExisting() {
 		s.logger.Error("existing session found, killing", "sessionID", id)
 		s.delete(id)
 	}
+}
+
+// setSessionActive records that a session is now active, counting it as created.
+// Under the one-session model, session creation and removal map directly to
+// the active/inactive transitions, so the gauge and the lifecycle counters are
+// two views of the same event and are updated together.
+func (s *Supervisor) setSessionActive() {
+	s.metrics.SessionActive.Set(1)
+	s.metrics.SessionsCreated.Inc()
+}
+
+// setSessionInactive records that no session is active, counting the termination with the given reason.
+func (s *Supervisor) setSessionInactive(reason string) {
+	s.metrics.SessionActive.Set(0)
+	s.metrics.SessionsTerminated.With(prometheus.Labels{
+		metrics.TerminationReason: reason,
+	}).Inc()
 }
 
 // launch prepares the requires directories and launches chromium, blocking

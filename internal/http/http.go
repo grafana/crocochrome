@@ -2,10 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/grafana/crocochrome/internal/crocochrome"
 	"github.com/koding/websocketproxy"
@@ -28,6 +30,7 @@ func New(logger *slog.Logger, supervisor *crocochrome.Supervisor) *Server {
 
 	mux.HandleFunc("GET /sessions", api.List)
 	mux.HandleFunc("POST /sessions", api.Create)
+	mux.HandleFunc("POST /sessions/acquire", api.Acquire)
 	mux.HandleFunc("DELETE /sessions/{id}", api.Delete)
 	mux.HandleFunc("/proxy/{id}", api.Proxy)
 
@@ -39,6 +42,24 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(rw, r)
 }
 
+// Route maps a request to its route pattern, for use as a metric label. It returns a bounded set of values so that
+// path parameters such as session IDs do not create unbounded metric cardinality.
+func Route(r *http.Request) string {
+	path := r.URL.Path
+	switch {
+	case path == "/sessions":
+		return "/sessions"
+	case path == "/sessions/acquire":
+		return "/sessions/acquire"
+	case strings.HasPrefix(path, "/sessions/"):
+		return "/sessions/{id}"
+	case strings.HasPrefix(path, "/proxy/"):
+		return "/proxy/{id}"
+	default:
+		return "unknown"
+	}
+}
+
 func (s *Server) List(rw http.ResponseWriter, r *http.Request) {
 	list := s.supervisor.Sessions()
 
@@ -47,6 +68,21 @@ func (s *Server) List(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
+	s.createSession(rw, r, s.supervisor.Create)
+}
+
+// Acquire creates a session only if no session is currently active, responding with 409 Conflict otherwise. Unlike
+// Create, it never terminates an existing session, making it a race-free atomic acquire for callers treating this
+// instance as part of a pool.
+func (s *Server) Acquire(rw http.ResponseWriter, r *http.Request) {
+	s.createSession(rw, r, s.supervisor.CreateIfFree)
+}
+
+func (s *Server) createSession(
+	rw http.ResponseWriter,
+	r *http.Request,
+	create func(crocochrome.CheckInfo) (crocochrome.SessionInfo, error),
+) {
 	var req crocochrome.CheckInfo
 	if r.Header.Get("Content-Type") != "application/json" {
 		s.logger.Info("no JSON content-type, proceeding with empty CheckInfo", "content_type", r.Header.Get("Content-Type"))
@@ -56,7 +92,17 @@ func (s *Server) Create(rw http.ResponseWriter, r *http.Request) {
 		req = crocochrome.CheckInfo{}
 	}
 
-	session, err := s.supervisor.Create(req)
+	session, err := create(req)
+	if errors.Is(err, crocochrome.ErrSessionExists) {
+		rw.WriteHeader(http.StatusConflict)
+		_, _ = rw.Write([]byte(err.Error()))
+		return
+	}
+	if errors.Is(err, crocochrome.ErrDraining) {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = rw.Write([]byte(err.Error()))
+		return
+	}
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		_, _ = rw.Write([]byte(err.Error()))
