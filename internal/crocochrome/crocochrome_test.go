@@ -300,6 +300,50 @@ func TestCrocochrome(t *testing.T) {
 		hb.AssertAliveDead(0, 1)
 	})
 
+	t.Run("Drain concurrent with Create is race-free", func(t *testing.T) {
+		t.Parallel()
+
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+
+		// Create reads s.draining under sessionsMtx and Drain writes it under the same lock. Racing them
+		// exercises the shutdown ordering and lets `go test -race` flag any future change that drops the
+		// lock from Drain.
+		var (
+			created   crocochrome.SessionInfo
+			createErr error
+			wg        sync.WaitGroup
+		)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			created, createErr = cc.Create(crocochrome.CheckInfo{})
+		}()
+		go func() {
+			defer wg.Done()
+			cc.Drain()
+		}()
+		wg.Wait()
+
+		// Whoever won, Create either succeeded or was rejected with ErrDraining, never a partial failure.
+		if createErr != nil && !errors.Is(createErr, crocochrome.ErrDraining) {
+			t.Fatalf("unexpected error from Create: %v", createErr)
+		}
+
+		// Drain has run, so no further session may be created regardless of which side won the race.
+		if _, err := cc.Create(crocochrome.CheckInfo{}); !errors.Is(err, crocochrome.ErrDraining) {
+			t.Fatalf("expected ErrDraining after Drain, got: %v", err)
+		}
+
+		// If the racing Create won, delete its session so Wait returns without waiting out the timeout.
+		if createErr == nil {
+			cc.Delete(created.ID)
+		}
+
+		cc.Wait()
+	})
+
 	t.Run("tracks active sessions in a gauge", func(t *testing.T) {
 		t.Parallel()
 

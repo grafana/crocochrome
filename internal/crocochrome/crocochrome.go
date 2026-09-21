@@ -15,7 +15,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -53,8 +52,8 @@ type Supervisor struct {
 	// it to work.
 	wg *sync.WaitGroup
 	// draining, when set, makes session creation fail with ErrDraining. Existing sessions are unaffected. It is set by
-	// Drain during graceful shutdown and never unset.
-	draining atomic.Bool
+	// Drain during graceful shutdown and never unset. Guarded by sessionsMtx.
+	draining bool
 }
 
 type Options struct {
@@ -219,7 +218,7 @@ func (s *Supervisor) create(checkInfo CheckInfo, ifFree bool) (SessionInfo, erro
 	s.sessionsMtx.Lock()
 	defer s.sessionsMtx.Unlock()
 
-	if s.draining.Load() {
+	if s.draining {
 		return SessionInfo{}, ErrDraining
 	}
 
@@ -395,7 +394,9 @@ func (s *Supervisor) emitTeardownObservability(sess session) {
 // still be deleted, proxied to, and will time out normally. Once draining, the session count can only decrease, so
 // Wait is guaranteed to return within the session timeout.
 func (s *Supervisor) Drain() {
-	s.draining.Store(true)
+	s.sessionsMtx.Lock()
+	defer s.sessionsMtx.Unlock()
+	s.draining = true
 }
 
 // Wait blocks until there are no sessions running.
