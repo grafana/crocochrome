@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.11](https://github.com/grafana/crocochrome/compare/v0.12.10...v0.12.11) (2026-09-22)
+
+
+### Fixes
+
+* disable Chrome's AI Mode omnibox popup to fix headless CPU regression ([#564](https://github.com/grafana/crocochrome/issues/564)) ([d160db7](https://github.com/grafana/crocochrome/commit/d160db74d853c270f4d4a19e3533c1a296e7d30d))
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/create-github-app-token action to v1.0 ([#558](https://github.com/grafana/crocochrome/issues/558)) ([ab79edb](https://github.com/grafana/crocochrome/commit/ab79edb96040ea0e7b5d0d1bfbc5c4cf6f080b48))
+
 ## [0.12.10](https://github.com/grafana/crocochrome/compare/v0.12.9...v0.12.10) (2026-09-09)
 
 
