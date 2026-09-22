@@ -418,6 +418,10 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger, oomBefore 
 		"--disable-first-run-ui",
 		"--disable-notifications",
 		"--disable-smooth-scrolling", // No need to burn CPU on this.
+		// Chrome's "AI Mode" omnibox popup (chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html)
+		// unconditionally creates and fully renders its own WebContents on every browser launch,
+		// even in --headless mode where it's never shown.
+		"--disable-features=WebUIOmniboxAimPopup",
 	}
 
 	if s.userAgent != "" {
