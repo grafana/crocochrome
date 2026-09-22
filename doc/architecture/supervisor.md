@@ -200,6 +200,7 @@ to be necessary; the rest are believed beneficial but unproven.
 | `--disable-default-apps`                                                                             | no first-run app installation                                                                                 |
 | `--disable-extensions`, `--disable-file-system`, `--disable-first-run-ui`, `--disable-notifications` | reduce surface/noise                                                                                          |
 | `--disable-smooth-scrolling`                                                                         | save CPU                                                                                                      |
+| `--disable-features=WebUIOmniboxAimPopup`                                                            | Chrome's AI Mode omnibox popup renders a full WebContents on every launch even under `--headless`; disabling avoids that CPU cost |
 | `--user-agent=<patched UA>`                                                                          | only added when a patched UA has been computed                                                                |
 
 ### Dropping privileges
