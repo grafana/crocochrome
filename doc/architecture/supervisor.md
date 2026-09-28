@@ -44,11 +44,11 @@ type Supervisor struct {
     logger      *slog.Logger
     cclient     *chromium.Client
     sessions    map[string]session   // ID -> session
-    sessionsMtx sync.Mutex           // guards sessions
+    sessionsMtx sync.Mutex           // guards sessions and draining
     metrics     *metrics.SupervisorMetrics
     userAgent   string               // patched UA, computed once
     wg          *sync.WaitGroup      // tracks active sessions; Wait() blocks on it
-    draining    atomic.Bool          // set by Drain(); creations fail with ErrDraining
+    draining    bool                 // set by Drain(); creations fail with ErrDraining
 }
 ```
 
@@ -194,9 +194,10 @@ outside the lock could publish "free" on a busy instance.
 - `wg` counts active sessions: `wg.Add(1)` in `Create`, `wg.Done()` when the
   `launch` goroutine returns. `Wait()` blocks on it and is what graceful
   shutdown uses to drain sessions.
-- `draining` is an `atomic.Bool` set by `Drain()` (never unset). Once set, the
-  create paths fail with `ErrDraining`, so the session count is monotonically
-  decreasing and `Wait()` is guaranteed to return within the session timeout.
+- `draining` is a `bool` guarded by `sessionsMtx`, set by `Drain()` (never
+  unset). Once set, the create paths fail with `ErrDraining`, so the session
+  count is monotonically decreasing and `Wait()` is guaranteed to return within
+  the session timeout.
 
 ## Launching Chromium
 
