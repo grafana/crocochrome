@@ -16,7 +16,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grafana/crocochrome/internal/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/internal/http"
+	"github.com/grafana/crocochrome/internal/metrics"
 	"github.com/grafana/crocochrome/internal/testutil"
+	"github.com/prometheus/client_golang/prometheus"
+	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestHTTP(t *testing.T) {
@@ -70,6 +73,182 @@ func TestHTTP(t *testing.T) {
 
 		if !strings.HasPrefix(parsedURL.Path, "/proxy/") {
 			t.Fatalf("expected returned url to be replaced to /proxy, got %q", parsedURL.String())
+		}
+	})
+
+	t.Run("acquire creates a session when free", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions/acquire", "", nil)
+		if err != nil {
+			t.Fatalf("making request: %v", err)
+		}
+
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+		}
+
+		var response struct {
+			ID              string `json:"ID"`
+			ChromiumVersion struct {
+				WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+			} `json:"chromiumVersion"`
+		}
+
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		if err != nil {
+			t.Fatalf("decoding response: %v", err)
+		}
+
+		if response.ID == "" {
+			t.Fatalf("session ID is empty")
+		}
+
+		if response.ChromiumVersion.WebSocketDebuggerURL == "" {
+			t.Fatalf("webSocketDebuggerUrl is unexpectedly empty")
+		}
+	})
+
+	t.Run("acquire returns 409 when busy and keeps the existing session", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+
+		acquireResp, err := http.Post(server.URL+"/sessions/acquire", "", nil)
+		if err != nil {
+			t.Fatalf("making acquire request: %v", err)
+		}
+		defer acquireResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if acquireResp.StatusCode != http.StatusConflict {
+			t.Fatalf("expected status %d, got %d", http.StatusConflict, acquireResp.StatusCode)
+		}
+
+		if list := cc.Sessions(); len(list) != 1 || list[0] != session.ID {
+			t.Fatalf("expected sessions list to contain only %q, got %v", session.ID, list)
+		}
+	})
+
+	t.Run("returns 503 while draining but allows deleting the existing session", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		server := httptest.NewServer(api)
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+
+		cc.Drain()
+
+		for _, path := range []string{"/sessions", "/sessions/acquire"} {
+			createResp, err := http.Post(server.URL+path, "", nil)
+			if err != nil {
+				t.Fatalf("making request to %s: %v", path, err)
+			}
+			createResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+			if createResp.StatusCode != http.StatusServiceUnavailable {
+				t.Fatalf("expected status %d from %s, got %d", http.StatusServiceUnavailable, path, createResp.StatusCode)
+			}
+		}
+
+		req, err := http.NewRequest(http.MethodDelete, server.URL+"/sessions/"+session.ID, nil)
+		if err != nil {
+			t.Fatalf("building delete request: %v", err)
+		}
+
+		deleteResp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("deleting session: %v", err)
+		}
+		deleteResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		if deleteResp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status %d deleting session while draining, got %d", http.StatusOK, deleteResp.StatusCode)
+		}
+	})
+
+	t.Run("labels request metrics by code, method and route", func(t *testing.T) {
+		hb := testutil.NewHeartbeat(t)
+		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
+		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		api := crocohttp.New(logger, cc)
+
+		reg := prometheus.NewRegistry()
+		server := httptest.NewServer(metrics.InstrumentHTTP(reg, api, crocohttp.Route))
+		t.Cleanup(server.Close)
+
+		resp, err := http.Post(server.URL+"/sessions", "", nil)
+		if err != nil {
+			t.Fatalf("creating session: %v", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		var session struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+			t.Fatalf("decoding session: %v", err)
+		}
+
+		req, err := http.NewRequest(http.MethodDelete, server.URL+"/sessions/"+session.ID, nil)
+		if err != nil {
+			t.Fatalf("building delete request: %v", err)
+		}
+
+		deleteResp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("deleting session: %v", err)
+		}
+		deleteResp.Body.Close() //nolint:errcheck // We can safely ignore this error.
+
+		// The delete request must be labeled with the route pattern, not the raw path containing the session ID.
+		wantMetric := `# HELP sm_crocochrome_requests_total Total number of requests received
+# TYPE sm_crocochrome_requests_total counter
+sm_crocochrome_requests_total{code="200",method="delete",route="/sessions/{id}"} 1
+sm_crocochrome_requests_total{code="200",method="post",route="/sessions"} 1
+`
+		if err := promtestutil.GatherAndCompare(reg, strings.NewReader(wantMetric),
+			"sm_crocochrome_requests_total"); err != nil {
+			t.Errorf("requests counter mismatch: %v", err)
 		}
 	})
 

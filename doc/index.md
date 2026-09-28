@@ -50,7 +50,7 @@ flowchart LR
 
     prom["Prometheus"]
 
-    k6 -- "POST /sessions<br/>DELETE /sessions/{id} (HTTP/JSON)" --> croco
+    k6 -- "POST /sessions[/acquire]<br/>DELETE /sessions/{id} (HTTP/JSON)" --> croco
     k6 -- "CDP over WebSocket<br/>via /proxy/{id}" --> croco
     croco -- "proxies WS to" --> chromium
     prom -- "scrape /metrics" --> croco
@@ -119,7 +119,7 @@ The architecture docs link to them rather than duplicate their content.
 
 | Boundary                            | Protocol                 | Notes                                         |
 |-------------------------------------|--------------------------|-----------------------------------------------|
-| Client → Crocochrome API            | HTTP/1.1 + JSON          | `GET/POST /sessions`, `DELETE /sessions/{id}` |
+| Client → Crocochrome API            | HTTP/1.1 + JSON          | `GET/POST /sessions`, `POST /sessions/acquire`, `DELETE /sessions/{id}` |
 | Client → Chromium (via Crocochrome) | WebSocket carrying CDP   | proxied through `/proxy/{id}`                 |
 | Crocochrome → Chromium (readiness)  | HTTP GET `/json/version` | polled until ready                            |
 | Prometheus → Crocochrome            | HTTP GET `/metrics`      | Prometheus text/exposition format             |

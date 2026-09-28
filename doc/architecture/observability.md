@@ -33,28 +33,57 @@ Crocochrome exposes three observability channels:
 All metrics use namespace `sm` + subsystem `crocochrome` (constants `metricNs`
 and `metricSubsystemCrocochrome` in `metrics.go`).
 
-| Metric                                     | Type          | Labels                                  | Defined in          | Meaning                                                                |
-|--------------------------------------------|---------------|-----------------------------------------|---------------------|------------------------------------------------------------------------|
-| `sm_crocochrome_requests_total`            | counter       | `code`                                  | `InstrumentHTTP`    | HTTP requests by status code                                           |
-| `sm_crocochrome_request_duration_seconds`  | histogram     | `code`                                  | `InstrumentHTTP`    | request latency; exp. buckets 0.5–60s (16)                             |
-| `sm_crocochrome_info`                      | gauge         | const: `version`, `commit`, `timestamp` | `AddVersionMetrics` | build info; always `1`                                                 |
-| `go_build_info`                            | gauge         | (stdlib)                                | `AddVersionMetrics` | standard Go build-info collector                                       |
-| `sm_crocochrome_session_duration_seconds`  | histogram     | —                                       | `Supervisor`        | session lifespan; exp. buckets 0.5–120s (16), native histogram enabled |
-| `sm_crocochrome_chromium_executions_total` | counter vec   | `state` (`finished`/`failed`)           | `Supervisor`        | Chromium process exits by outcome                                      |
-| `sm_crocochrome_chromium_resource_usage`   | histogram vec | `resource` (`rss`)                      | `Supervisor`        | max RSS per execution (bytes); linear buckets 0–1024 MiB               |
-| `sm_crocochrome_chromium_oom_kills_total`  | counter       | —                                       | `Supervisor`        | kernel OOM-killer fires within the cgroup during a session             |
+| Metric                                       | Type          | Labels                                                | Defined in          | Meaning                                                                |
+|----------------------------------------------|---------------|-------------------------------------------------------|---------------------|------------------------------------------------------------------------|
+| `sm_crocochrome_requests_total`              | counter vec   | `code`, `method`, `route`                             | `InstrumentHTTP`    | HTTP requests by status, method, and route pattern                    |
+| `sm_crocochrome_request_duration_seconds`    | histogram vec | `code`, `method`, `route`                             | `InstrumentHTTP`    | request latency; exp. buckets 0.5–60s (16)                             |
+| `sm_crocochrome_info`                        | gauge         | const: `version`, `commit`, `timestamp`               | `AddVersionMetrics` | build info; always `1`                                                 |
+| `go_build_info`                              | gauge         | (stdlib)                                              | `AddVersionMetrics` | standard Go build-info collector                                       |
+| `sm_crocochrome_session_active`              | gauge         | —                                                     | `Supervisor`        | `1` while a session is active, `0` otherwise (boolean; see below)      |
+| `sm_crocochrome_sessions_created_total`      | counter       | —                                                     | `Supervisor`        | sessions successfully created                                          |
+| `sm_crocochrome_sessions_terminated_total`   | counter vec   | `reason` (`deleted`/`timeout`/`replaced`)             | `Supervisor`        | sessions ended, by termination path (see below)                        |
+| `sm_crocochrome_session_duration_seconds`    | histogram     | —                                                     | `Supervisor`        | session lifespan; exp. buckets 0.5–120s (16), native histogram enabled |
+| `sm_crocochrome_chromium_executions_total`   | counter vec   | `state` (`finished`/`failed`)                         | `Supervisor`        | Chromium process exits by outcome                                      |
+| `sm_crocochrome_chromium_resource_usage`     | histogram vec | `resource` (`rss`)                                    | `Supervisor`        | max RSS per execution (bytes); linear buckets 0–1024 MiB               |
+| `sm_crocochrome_chromium_oom_kills_total`    | counter       | —                                                     | `Supervisor`        | kernel OOM-killer fires within the cgroup during a session             |
+
+### Session lifecycle metrics
+
+`session_active` is deliberately a **boolean**, not a session count: when a
+fleet of crocochrome instances is used as a browser pool, the fleet busy-ratio
+is simply `avg(sm_crocochrome_session_active)` across instances, with no
+assumption about per-instance capacity baked into the queries.
+
+`sessions_terminated_total{reason}` distinguishes the three teardown paths:
+`deleted` (explicit client `DELETE`), `timeout` (the session timeout reaper
+fired), and `replaced` (killed by `Create`'s kill-existing semantics). A
+sustained rate of `timeout` terminations means clients are not releasing
+their sessions — for pool deployments, this is the primary signal that
+explicit releases are failing to arrive and capacity is being reclaimed only
+by the reaper.
+
+All three are updated by the supervisor's `setSessionActive` /
+`setSessionInactive(reason)` helpers, atomically with the session-map
+mutation while holding the sessions mutex, so the gauge and counters can
+never be observed out of sync with the map.
 
 ### Where metrics are wired and emitted
 
 - **HTTP metrics** (`requests_total`, `request_duration_seconds`) are registered
-  and attached by `metrics.InstrumentHTTP(reg, handler)`, called from `main.go`.
+  and attached by `metrics.InstrumentHTTP(reg, handler, route)`, called from
+  `main.go` with `crocohttp.Route` as the route classifier. The `route` label
+  is always a route pattern from a bounded set (`/sessions`,
+  `/sessions/acquire`, `/sessions/{id}`, `/proxy/{id}`, `unknown`), never a
+  raw path, so session IDs cannot create unbounded cardinality.
 - **Version metrics** (`info`, `go_build_info`) are registered by
   `metrics.AddVersionMetrics(reg)`, also from `main.go`, sourced from
   `internal/version`.
 - **Supervisor metrics** are created by `metrics.Supervisor(reg)` which returns a
   `*SupervisorMetrics` struct (`SessionDuration`, `ChromiumExecutions`,
-  `ChromiumResources`, `OOMKills`). They are observed in
-  `Supervisor.launch` (see [supervisor.md](supervisor.md)):
+  `ChromiumResources`, `SessionActive`, `SessionsCreated`,
+  `SessionsTerminated`, `OOMKills`). The session lifecycle metrics are updated
+  at the session-map mutation points (see the section above); the rest are
+  observed in `Supervisor.launch` (see [supervisor.md](supervisor.md)):
   - `SessionDuration.Observe(...)` in a `defer`, measuring wall time around
     `cmd.Run()`.
   - `ChromiumResources` observes `Rusage.Maxrss` (converted KiB → bytes) from
