@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/grafana/crocochrome/compare/v0.12.12...v0.13.0) (2026-09-28)
+
+
+### Features
+
+* Add create-if-free acquire endpoint ([#548](https://github.com/grafana/crocochrome/issues/548)) ([6913408](https://github.com/grafana/crocochrome/commit/6913408170c8d0b9ebe8b3bdc847ee07129051b2))
+
 ## [0.12.12](https://github.com/grafana/crocochrome/compare/v0.12.11...v0.12.12) (2026-09-25)
 
 
