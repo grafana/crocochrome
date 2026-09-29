@@ -650,7 +650,7 @@ func (s *Supervisor) ComputeUserAgent(ctx context.Context) error {
 	go func() {
 		err := s.launch(ctx, logger, 0, skipOOMSampling)
 		if err != nil {
-			s.logger.Error("launching chromium", "err", err)
+			s.logger.Error("ComputeUserAgent launching chromium", "err", err)
 		}
 	}()
 
