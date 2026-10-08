@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.1](https://github.com/grafana/crocochrome/compare/v0.13.0...v0.13.1) (2026-10-01)
+
+
+### Fixes
+
+* update compute user agent error log ([#570](https://github.com/grafana/crocochrome/issues/570)) ([97b0eb2](https://github.com/grafana/crocochrome/commit/97b0eb20a3fbfde12a6404b42c911e59d8aacc6d))
+
+
+### Miscellaneous Chores
+
+* Update docker/build-push-action digest to c3c9e26 ([#559](https://github.com/grafana/crocochrome/issues/559)) ([b94399b](https://github.com/grafana/crocochrome/commit/b94399bbb141fa68e09d82a95e7f1aa00879e219))
+* Update docker/setup-buildx-action digest to f87e599 ([#561](https://github.com/grafana/crocochrome/issues/561)) ([fdc800c](https://github.com/grafana/crocochrome/commit/fdc800c5c1a82e8bc5a6cdfd704618c65d94d319))
+* Update docker/setup-qemu-action digest to 9901266 ([#560](https://github.com/grafana/crocochrome/issues/560)) ([291e6d1](https://github.com/grafana/crocochrome/commit/291e6d11218eeece3e977d8516e98fca705f44d2))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.48.0 ([#573](https://github.com/grafana/crocochrome/issues/573)) ([46ea981](https://github.com/grafana/crocochrome/commit/46ea9817b63072d17fdabcecc5794151455bb842))
+* Update grafana/k6-v2 Docker tag to v2.3.0 ([#567](https://github.com/grafana/crocochrome/issues/567)) ([87d8c4e](https://github.com/grafana/crocochrome/commit/87d8c4e72dc3eda2fe63576fccb45206c155ff37))
+
 ## [0.13.0](https://github.com/grafana/crocochrome/compare/v0.12.12...v0.13.0) (2026-09-28)
 
 
