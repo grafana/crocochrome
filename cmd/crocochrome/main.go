@@ -16,6 +16,7 @@ import (
 
 	"github.com/grafana/crocochrome/internal/crocochrome"
 	crocohttp "github.com/grafana/crocochrome/internal/http"
+	"github.com/grafana/crocochrome/internal/log"
 	"github.com/grafana/crocochrome/internal/metrics"
 	"github.com/grafana/crocochrome/internal/version"
 
@@ -27,26 +28,34 @@ type Config struct {
 	UserGroup            int
 	TempDir              string
 	EnableProcessMetrics bool
+	LogLevel             log.Flag
 }
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
+	config := &Config{
+		LogLevel: log.Flag(slog.LevelDebug),
+	}
 
-	config := &Config{}
 	flag.StringVar(&config.TempDir, "temp-dir", "/chromium-tmp", "Directory for chromiumium instances to write their data to")
 	flag.IntVar(&config.UserGroup, "user-group", 65534, "Default user to run as. For local development, set this flag to 0")
 	flag.BoolVar(&config.EnableProcessMetrics, "process-metrics", false, "Enable per-process RSS collection at session teardown. Adds negligible overhead.")
+	flag.Var(&config.LogLevel, "log-level", "log level")
 
 	flag.Parse()
-	if err := run(logger, config); err != nil {
-		logger.Error("run failed to execute",
+
+	logHandler := log.NewHandler(os.Stderr, &log.HandlerOptions{
+		Level: config.LogLevel.Value(),
+	})
+
+	if err := run(logHandler, config); err != nil {
+		slog.New(logHandler).Error("run failed to execute",
 			slog.String("msg", err.Error()))
 	}
 }
 
-func run(logger *slog.Logger, config *Config) error {
+func run(logHandler slog.Handler, config *Config) error {
+	logger := slog.New(logHandler)
+
 	logger.Info("Starting crocochrome supervisor",
 		slog.String("version", version.Short()),
 		slog.String("commit", version.Commit()),
@@ -84,6 +93,10 @@ func run(logger *slog.Logger, config *Config) error {
 
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	mux.Handle("/", instrumentedHandler)
+
+	if logHttpHandler, ok := logHandler.(http.Handler); ok {
+		mux.Handle("/logger", logHttpHandler)
+	}
 
 	const address = ":8080"
 	server := &http.Server{
