@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.2](https://github.com/grafana/crocochrome/compare/v0.13.1...v0.13.2) (2026-10-15)
+
+
+### Miscellaneous Chores
+
+* Update module github.com/moby/go-archive to v0.3.3 ([#579](https://github.com/grafana/crocochrome/issues/579)) ([5d978fb](https://github.com/grafana/crocochrome/commit/5d978fb34db195d4862c027bf0efef36b0b35a54))
+* Update module github.com/shirou/gopsutil/v4 to v4.26.9 ([#580](https://github.com/grafana/crocochrome/issues/580)) ([f1b5690](https://github.com/grafana/crocochrome/commit/f1b5690176823c8e004f04bd169e076262d70e9c))
+
 ## [0.13.1](https://github.com/grafana/crocochrome/compare/v0.13.0...v0.13.1) (2026-10-01)
 
 
