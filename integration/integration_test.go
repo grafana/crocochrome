@@ -31,6 +31,9 @@ const (
 	k6V2ImageVersion = "grafana/k6:2.3.0"
 )
 
+// hardenedCapabilities are the capabilities the crocochrome binary requires, as documented in doc/capabilities.md.
+var hardenedCapabilities = []string{"SETUID", "SETGID", "KILL", "CHOWN", "DAC_OVERRIDE", "FOWNER"}
+
 // TestIntegration performs integration tests by spinning up a production-ish container and try to run k6 against it,
 // implementing a client to crocochrome and using the official k6 image to run the test.
 func TestIntegration(t *testing.T) {
@@ -67,6 +70,12 @@ func TestIntegration(t *testing.T) {
 			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
 			// and be writable.
 			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			// Mimic the securityContext recommended in doc/capabilities.md.
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.ReadonlyRootfs = true
+				hc.CapDrop = []string{"ALL"}
+				hc.CapAdd = hardenedCapabilities
+			},
 		},
 	})
 	testcontainers.CleanupContainer(t, cc)
@@ -256,6 +265,64 @@ func TestIntegration(t *testing.T) {
 
 		<-waitStop
 	})
+}
+
+// TestIntegrationMissingCapabilities checks that crocochrome refuses to start when it cannot use its file
+// capabilities, which is what happens with allowPrivilegeEscalation: false in Kubernetes.
+func TestIntegrationMissingCapabilities(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skipf("Skipping integration test due to -short")
+	}
+
+	ctx := t.Context()
+
+	image, err := buildImage("..", "crocochrome")
+	if err != nil {
+		t.Fatalf("building crocochrome container: %v", err)
+	}
+
+	cc, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		Started: true,
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:      image,
+			WaitingFor: wait.ForExit().WithExitTimeout(time.Minute),
+			Mounts:     testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
+			HostConfigModifier: func(hc *container.HostConfig) {
+				hc.ReadonlyRootfs = true
+				hc.CapDrop = []string{"ALL"}
+				hc.CapAdd = hardenedCapabilities
+				hc.SecurityOpt = []string{"no-new-privileges"}
+			},
+		},
+	})
+	testcontainers.CleanupContainer(t, cc)
+	if err != nil {
+		t.Fatalf("starting crocochrome container: %v", err)
+	}
+
+	status, err := cc.Inspect(ctx)
+	if err != nil {
+		t.Fatalf("inspecting container: %v", err)
+	}
+
+	if ec := status.State.ExitCode; ec == 0 {
+		t.Errorf("expected non-zero exit code, got %d", ec)
+	}
+
+	logs, err := cc.Logs(ctx)
+	if err != nil {
+		t.Fatalf("reading container logs: %v", err)
+	}
+
+	//nolint:errcheck // Test code.
+	defer logs.Close()
+
+	output, _ := io.ReadAll(logs)
+	if !bytes.Contains(output, []byte("missing capabilities")) {
+		t.Errorf("container logs do not mention missing capabilities:\n%s", output)
+	}
 }
 
 // createSession calls the crocochrome API to create a session, starting a chromium process and retrieving its WS URL.
