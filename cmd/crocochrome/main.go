@@ -54,6 +54,12 @@ func run(logger *slog.Logger, config *Config) error {
 		slog.String("timestamp", version.Buildstamp()),
 	)
 
+	if config.UserGroup != 0 {
+		if err := crocochrome.CheckCapabilities("/proc"); err != nil {
+			return err
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	registry := prometheus.NewRegistry()
