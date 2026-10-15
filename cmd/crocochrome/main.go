@@ -43,6 +43,7 @@ func main() {
 	if err := run(logger, config); err != nil {
 		logger.Error("run failed to execute",
 			slog.String("msg", err.Error()))
+		os.Exit(1)
 	}
 }
 
