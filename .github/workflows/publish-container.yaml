@@ -47,3 +47,13 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ steps.repo.outputs.version }}
           push: true
           platforms: linux/amd64,linux/arm64
+
+      - name: Build and push unprivileged image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: . # Use checked out repo with full history, instead of letting build making a shallow clone.
+          target: unprivileged
+          tags: |-
+            ghcr.io/${{ github.repository }}:${{ steps.repo.outputs.version }}-unprivileged
+          push: true
+          platforms: linux/amd64,linux/arm64

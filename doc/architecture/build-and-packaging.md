@@ -16,8 +16,11 @@ generated: 2026-06-05
 
 ## Overview
 
-Crocochrome ships as a single container image: a statically-linked Go binary on
-top of a Chromium-bearing Alpine base. This page covers how the binary is built,
+Crocochrome ships as two container images built from the same Dockerfile: a
+statically-linked Go binary on top of a Chromium-bearing Alpine base. The
+**hardened** image (the default) runs Chromium as a different user, using file
+capabilities. The **unprivileged** image needs no capabilities and runs Chromium
+as its own user. This page covers how the binary is built,
 how the image is assembled (and hardened), how the Makefile orchestrates builds
 and tests in a pinned toolchain container, and what CI enforces.
 
@@ -42,9 +45,14 @@ tag at release time).
 flowchart LR
     A["Stage: buildtools<br/>ghcr.io/grafana/grafana-build-tools<br/>make LOCAL=true build (CGO_ENABLED=0)"]
     B["Stage: setcapper<br/>chromium-swiftshader-alpine<br/>apk add libcap; setcap on binary"]
-    C["Stage: final<br/>chromium-swiftshader-alpine<br/>adduser k6; add tini;<br/>delete setuid bins; COPY binary 0500"]
+    C["Stage: base<br/>chromium-swiftshader-alpine<br/>adduser k6; add tini;<br/>delete setuid bins"]
+    D["Stage: unprivileged<br/>COPY binary 0555"]
+    E["Stage: hardened (default)<br/>COPY binary 0500"]
     A -- "/usr/local/bin/crocochrome" --> B
-    B -- "binary w/ file caps" --> C
+    A -- "binary" --> D
+    B -- "binary w/ file caps" --> E
+    C --> D
+    C --> E
 ```
 
 1. **`buildtools`** — `ghcr.io/grafana/grafana-build-tools` (pinned by tag +
@@ -64,18 +72,32 @@ flowchart LR
    hand over and clean up Chromium's per-session temporary directory. See
    [security.md](security.md) and [capabilities.md](../capabilities.md).
 
-3. **`final`** — `ghcr.io/grafana/chromium-swiftshader-alpine` (Chromium +
-   SwiftShader software renderer). It:
+3. **`base`** — `ghcr.io/grafana/chromium-swiftshader-alpine` (Chromium +
+   SwiftShader software renderer), shared by both images. It:
 
    - creates user `k6` (UID **6666**, no home, `/bin/nologin`, password disabled);
    - installs `tini` from the Alpine community repo;
    - **deletes every setuid binary** (`find / -type f -perm -4000 -delete`),
      notably `/usr/lib/chromium/chrome-sandbox`, to shrink attack surface
-     (necessary because file caps preclude `allowPrivilegeEscalation: false`);
+     (necessary because file caps preclude `allowPrivilegeEscalation: false`).
+
+4. **`unprivileged`** — built with `--target unprivileged`. It:
+
+   - copies the binary from `buildtools`, without file capabilities, owned by
+     root with `--chmod=0555`, so any UID can run it;
+   - runs as `USER k6` with entrypoint
+     `tini -- /usr/local/bin/crocochrome -user-group=0`, so Chromium runs as the
+     same user as crocochrome.
+
+5. **`hardened`** — the last stage, and therefore the default target. It:
+
    - copies the binary `--chown=k6:k6 --chmod=0500` so only `k6` (not `nobody`,
      the user Chromium runs as) can read or run the capability-bearing binary;
    - runs as `USER k6` with entrypoint `tini -- /usr/local/bin/crocochrome`
      (tini as PID 1 for signal forwarding and zombie reaping).
+
+   It must remain the last stage, so that `docker build .` keeps producing the
+   hardened image.
 
 The base image tag encodes the Chromium version (e.g.
 `147.0.7727.101-r0-3.23.4`); both tag and digest are pinned and updated by
@@ -95,7 +117,8 @@ default, for a reproducible toolchain. Set `LOCAL=true` to run natively
 | `test-integration`    | `go test -v -tags=integration ./integration/...`                    | **not** wrapped in buildtools (needs the host Docker socket) |
 | `lint`                | `golangci-lint run ./...`                                           |                                                              |
 | `lint-version`        | extract golangci-lint version from the image                        | lets CI download a matching linter                           |
-| `build-container`     | `docker build -t test.local/crocochrome .`                          |                                                              |
+| `build-container`     | `docker build -t test.local/crocochrome .`                          | hardened image                                               |
+| `build-container-unprivileged` | `docker build --target unprivileged -t test.local/crocochrome-unprivileged .` | unprivileged image                         |
 | `shell`               | open a shell in buildtools                                          | debugging                                                    |
 | `clean` / `distclean` | remove artifacts / `git clean -Xf`                                  |                                                              |
 
@@ -115,7 +138,7 @@ usually not world-readable). See [testing.md](testing.md).
 | **Build**                 | `make build`                                                                                                                                                  |
 | **Test**                  | `make test` on `ubuntu-latest` and `ubuntu-24.04-arm` (matrix)                                                                                                |
 | **Integration tests**     | `make test-integration` on both architectures                                                                                                                 |
-| **Build container image** | `docker/build-push-action`, `push: false`, `platforms: linux/amd64,linux/arm64`, GHA cache                                                                    |
+| **Build container image** | `docker/build-push-action`, `push: false`, `platforms: linux/amd64,linux/arm64`, GHA cache; matrix over the `hardened` and `unprivileged` targets             |
 | **Lint**                  | `make CI=false LOCAL=false S= lint` (forces the linter to run inside the container so its Go toolchain matches), preceded by the `.dockerignore` sanity check |
 
 #### The `.dockerignore` sanity check
@@ -135,9 +158,10 @@ version — which breaks the deployment process. (If one were ever truly needed,
 
 Checks out with `fetch-depth: 0` (full history, required by `scripts/version`),
 computes the version, sets up QEMU + Buildx (with `cache-binary: false` to avoid
-[cache poisoning](https://woodruffw.github.io/zizmor/audits/#cache-poisoning)), logs into `ghcr.io`, and builds+pushes a multiarch
-image tagged `ghcr.io/<repo>:<version>` with `context: .` (the full checkout,
-not a shallow clone).
+[cache poisoning](https://woodruffw.github.io/zizmor/audits/#cache-poisoning)), logs into `ghcr.io`, and builds+pushes two multiarch
+images with `context: .` (the full checkout, not a shallow clone): the hardened
+image tagged `ghcr.io/<repo>:<version>`, and the `unprivileged` target tagged
+`ghcr.io/<repo>:<version>-unprivileged`.
 
 ### Other workflows
 

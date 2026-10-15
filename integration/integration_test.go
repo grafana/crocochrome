@@ -43,10 +43,57 @@ func TestIntegration(t *testing.T) {
 		t.Skipf("Skipping integration test due to -short")
 	}
 
+	// Variants run sequentially, as each of them runs its own containers.
+	for _, v := range []struct {
+		name   string
+		target string
+		user   string
+		// hostConfig mimics the securityContext recommended for the variant in doc/capabilities.md.
+		hostConfig func(hc *container.HostConfig)
+	}{
+		{
+			name:   "hardened",
+			target: "hardened",
+			hostConfig: func(hc *container.HostConfig) {
+				hc.ReadonlyRootfs = true
+				hc.CapDrop = []string{"ALL"}
+				hc.CapAdd = hardenedCapabilities
+			},
+		},
+		{
+			name:       "unprivileged",
+			target:     "unprivileged",
+			hostConfig: unprivilegedHostConfig,
+		},
+		{
+			// OpenShift runs containers with an arbitrary UID and GID 0.
+			name:       "unprivileged/arbitrary uid",
+			target:     "unprivileged",
+			user:       "123456:0",
+			hostConfig: unprivilegedHostConfig,
+		},
+	} {
+		t.Run(v.name, func(t *testing.T) {
+			testVariant(t, v.target, v.user, v.hostConfig)
+		})
+	}
+}
+
+// unprivilegedHostConfig mimics the securityContext recommended for the unprivileged image.
+func unprivilegedHostConfig(hc *container.HostConfig) {
+	hc.ReadonlyRootfs = true
+	hc.CapDrop = []string{"ALL"}
+	hc.SecurityOpt = []string{"no-new-privileges"}
+}
+
+// testVariant runs the integration test suite against the image built from the given Dockerfile target.
+func testVariant(t *testing.T, target, user string, hostConfig func(hc *container.HostConfig)) {
+	t.Helper()
+
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	image, err := buildImage("..", "crocochrome")
+	image, err := buildImage("..", "crocochrome", target)
 	if err != nil {
 		t.Fatalf("building crocochrome container: %v", err)
 	}
@@ -67,14 +114,17 @@ func TestIntegration(t *testing.T) {
 			ExposedPorts: []string{"8080/tcp"},
 			WaitingFor:   wait.ForExposedPort(),
 			Networks:     []string{network.Name},
-			// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
-			// and be writable.
-			Mounts: testcontainers.Mounts(testcontainers.VolumeMount("chromium-tmp", "/chromium-tmp")),
-			// Mimic the securityContext recommended in doc/capabilities.md.
 			HostConfigModifier: func(hc *container.HostConfig) {
-				hc.ReadonlyRootfs = true
-				hc.CapDrop = []string{"ALL"}
-				hc.CapAdd = hardenedCapabilities
+				// Since https://github.com/grafana/crocochrome/pull/12, crocochrome requires /chromium-tmp to exist
+				// and be writable. Without capabilities, crocochrome cannot write to a root-owned volume, so use a
+				// world-writable tmpfs, like a k8s emptyDir.
+				hc.Tmpfs = map[string]string{"/chromium-tmp": "mode=1777"}
+				hostConfig(hc)
+			},
+			ConfigModifier: func(c *container.Config) {
+				if user != "" {
+					c.User = user
+				}
 			},
 		},
 	})
@@ -278,7 +328,7 @@ func TestIntegrationMissingCapabilities(t *testing.T) {
 
 	ctx := t.Context()
 
-	image, err := buildImage("..", "crocochrome")
+	image, err := buildImage("..", "crocochrome", "hardened")
 	if err != nil {
 		t.Fatalf("building crocochrome container: %v", err)
 	}

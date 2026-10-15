@@ -2,7 +2,7 @@
 
 Crocochrome is a chromium supervisor, which runs and reaps chromium processes on demand.
 
-Crocochrome needs to be granted certain linux capabilities to funciton, see [docs/capabilities.md](/doc/capabilities.md) for details.
+Crocochrome needs to be granted certain linux capabilities to funciton, see [docs/capabilities.md](/doc/capabilities.md) for details. An unprivileged image, tagged `<version>-unprivileged`, needs no capabilities at the cost of weaker isolation between crocochrome and chromium; see [Unprivileged image](/doc/capabilities.md#unprivileged-image).
 
 Crocochrome runs chromium with `--no-sandbox`. The reason for this is that to run with sandboxing enabled, [chromium needs user namespaces to work](doc/chromium-sandbox.md), which are not available everywhere.
 
