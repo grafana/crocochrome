@@ -60,7 +60,14 @@ jobs:
           make test-integration
 
   build-container:
-    name: Build container image
+    name: Build container image${{ matrix.suffix }}
+    strategy:
+      matrix:
+        include:
+          - target: hardened
+            suffix: ""
+          - target: unprivileged
+            suffix: -unprivileged
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -73,10 +80,11 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           push: false
-          tags: ci.local/crocochrome:${{ github.sha }}
+          target: ${{ matrix.target }}
+          tags: ci.local/crocochrome:${{ github.sha }}${{ matrix.suffix }}
           platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
 
   golangci:
     name: Lint

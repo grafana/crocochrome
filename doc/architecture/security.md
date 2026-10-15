@@ -90,6 +90,29 @@ the setuid binaries (above) is the compensating control for keeping
 `allowPrivilegeEscalation` enabled. The full Kubernetes `securityContext`
 guidance is in [capabilities.md](../capabilities.md).
 
+### The unprivileged image
+
+The unprivileged image (Dockerfile target `unprivileged`, tag
+`<version>-unprivileged`) trades the user boundary for a container that needs
+no capabilities and runs with `allowPrivilegeEscalation: false`. Its binary
+has no file capabilities, is owned by root with mode `0555` (runnable by any
+UID), and runs Chromium as its own user (`-user-group=0`).
+
+Residual risks, compared to the hardened image, if Chromium is compromised:
+
+- It can signal or kill crocochrome, a pod-level denial of service that
+  Kubernetes recovers from by restarting the pod.
+- It can `ptrace` crocochrome, unless Yama (`ptrace_scope=1`) or seccomp
+  prevent it.
+- It can write to `/chromium-tmp` outside its session directory, and those
+  files persist into later sessions on the same pod.
+- It can leave files in its session directory that crocochrome, lacking
+  `cap_dac_override`, cannot remove. Crocochrome then panics and the pod
+  restarts, which is no worse than the first point.
+
+See [capabilities.md](../capabilities.md#choosing-an-image) for guidance on
+choosing an image.
+
 ## Network boundaries & trust zones
 
 ```mermaid

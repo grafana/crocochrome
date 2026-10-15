@@ -32,3 +32,33 @@ securityContext:
     add: ["setuid", "setgid", "kill", "chown", "dac_override", "fowner"]
     drop: ["all"]
 ```
+
+## Unprivileged image
+
+Crocochrome is also published as an unprivileged image, tagged `<version>-unprivileged` and built from the `unprivileged` target of the Dockerfile. In this image, the crocochrome binary has no file capabilities, and crocochrome runs chromium as its own user (`-user-group=0`). The binary can be run by any user, so the image also works with an arbitrary UID, as OpenShift assigns.
+
+The recommended (container) `securityContext` for the unprivileged image is the following, which meets the `restricted` Pod Security Standard:
+```yaml
+securityContext:
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["all"]
+```
+
+`/chromium-tmp` must be writable by the user crocochrome runs as. A Kubernetes `emptyDir` volume is.
+
+If the hardened image is run with `allowPrivilegeEscalation: false`, or without the required capabilities, crocochrome refuses to start and logs which capabilities are missing.
+
+### Choosing an image
+
+The hardened image keeps chromium and crocochrome apart through the Unix user boundary. A compromised chromium cannot read crocochrome's memory, send it signals, or interfere with later sessions. Use it when you don't trust the code chromium runs: for example, when the scripts come from multiple parties, or when they visit pages whose content you don't control.
+
+In the unprivileged image, chromium runs as the same user as crocochrome. If chromium is compromised, for example through a malicious page, it can:
+- Read crocochrome's environment, which holds nothing sensitive.
+- Signal or kill crocochrome. This takes down the pod, which Kubernetes restarts.
+- Attach to crocochrome with `ptrace`. Yama's `ptrace_scope=1`, the default on most distributions, only allows tracing descendants, and chromium is a child of crocochrome. Neither this nor the runtime's default seccomp profile is guaranteed on every node.
+- Write files to `/chromium-tmp` outside its session directory, which persist into later sessions on the same pod.
+
+The unprivileged image is a reasonable choice when you trust both the check scripts and the content of the pages they load. A trusted script can still visit a page that serves malicious content, for example through third-party scripts or a compromised site, so the hardened image remains the safer default.
