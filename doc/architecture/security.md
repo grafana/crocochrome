@@ -69,8 +69,12 @@ Crocochrome needs a few privileged operations even though it runs as non-root:
   `syscall.SysProcAttr.Credential` to run the browser as another UID/GID
   (`nobody`, UID 65534 by default), which needs `cap_setuid` / `cap_setgid`.
 - **Kill** the Chromium process tree on teardown/timeout (`cap_kill`).
-- **Set up sandbox files** for sm-k6-runner (`cap_chown`, `cap_dac_override`,
-  `cap_fowner`).
+- **Hand over and clean up** the per-session temporary directory: `chown` it
+  to the Chromium user (`cap_chown`), and remove it, along with everything
+  Chromium wrote to it, after the session (`cap_dac_override`, `cap_fowner`).
+
+Together, these operations form crocochrome's own sandbox around Chromium,
+standing in for Chromium's disabled one.
 
 These capabilities are granted to the **binary** via `setcap ...+ep` in the
 Dockerfile.

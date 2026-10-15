@@ -60,9 +60,9 @@ flowchart LR
        /usr/local/bin/crocochrome
    ```
 
-   These caps let Crocochrome drop privileges, kill the Chromium tree, and set
-   up the sandbox files used by sm-k6-runner. See [security.md](security.md) and
-   [capabilities.md](../capabilities.md).
+   These caps let Crocochrome drop privileges, kill the Chromium tree, and
+   hand over and clean up Chromium's per-session temporary directory. See
+   [security.md](security.md) and [capabilities.md](../capabilities.md).
 
 3. **`final`** — `ghcr.io/grafana/chromium-swiftshader-alpine` (Chromium +
    SwiftShader software renderer). It:
