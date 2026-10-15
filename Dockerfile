@@ -18,8 +18,8 @@ RUN apk --no-cache add libcap
 
 COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 
-# The following capabilities are used by sm-k6-runner to sandbox the k6 binary. More details about what each cap is used
-# for can be found in /sandbox/sandbox.go.
+# The following capabilities are used by crocochrome to run chromium as a different user, and to clean up after it. More
+# details about what each cap is used for can be found in doc/capabilities.md.
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
