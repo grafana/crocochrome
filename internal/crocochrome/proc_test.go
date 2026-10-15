@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -399,5 +400,67 @@ func TestCollectProcessMetrics_cgroupsv1Layout(t *testing.T) {
 	}
 	if len(processes) != 1 || processes[0].Type != "browser" {
 		t.Errorf("unexpected processes: %+v", processes)
+	}
+}
+
+func TestCheckCapabilities(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		capEff      string
+		wantMissing []string
+	}{
+		{
+			name:   "all required capabilities",
+			capEff: "00000000000000eb",
+		},
+		{
+			name:   "superset of required capabilities",
+			capEff: "000001ffffffffff",
+		},
+		{
+			name:        "some capabilities missing",
+			capEff:      "00000000000000e0",
+			wantMissing: []string{"CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FOWNER"},
+		},
+		{
+			name:        "no capabilities",
+			capEff:      "0000000000000000",
+			wantMissing: []string{"CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FOWNER", "CAP_KILL", "CAP_SETGID", "CAP_SETUID"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			procRoot := t.TempDir()
+			pidDir := filepath.Join(procRoot, "42")
+			if err := os.MkdirAll(pidDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("42", filepath.Join(procRoot, "self")); err != nil {
+				t.Fatal(err)
+			}
+			status := fmt.Sprintf("Name:\tcrocochrome\nCapEff:\t%s\n", tc.capEff)
+			if err := os.WriteFile(filepath.Join(pidDir, "status"), []byte(status), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			err := CheckCapabilities(procRoot)
+			if len(tc.wantMissing) == 0 {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if want := strings.Join(tc.wantMissing, ", "); !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q does not mention %q", err, want)
+			}
+		})
 	}
 }
