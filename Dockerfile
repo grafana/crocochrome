@@ -47,7 +47,8 @@ FROM base AS unprivileged
 # UID.
 COPY --from=buildtools --chmod=0555 /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 
-USER k6
+# Numeric (k6:k6), so that Kubernetes can verify runAsNonRoot without a runAsUser in the pod spec.
+USER 6666:6666
 
 ENTRYPOINT [ "tini", "--", "/usr/local/bin/crocochrome", "-user-group=0" ]
 

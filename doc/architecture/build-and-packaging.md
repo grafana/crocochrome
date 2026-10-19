@@ -85,7 +85,8 @@ flowchart LR
 
    - copies the binary from `buildtools`, without file capabilities, owned by
      root with `--chmod=0555`, so any UID can run it;
-   - runs as `USER k6` with entrypoint
+   - runs as `USER 6666:6666` (`k6`), numeric so that Kubernetes can verify
+     `runAsNonRoot` without a `runAsUser`, with entrypoint
      `tini -- /usr/local/bin/crocochrome -user-group=0`, so Chromium runs as the
      same user as crocochrome.
 
