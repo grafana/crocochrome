@@ -85,8 +85,9 @@ File capabilities and Kubernetes' recommended `allowPrivilegeEscalation: false`
 are **mutually incompatible**: setting it to `false` enables `no_new_privs`,
 which strips file capabilities. So Crocochrome **must not** set
 `allowPrivilegeEscalation: false`, and the same capabilities must _also_ be added
-to the container's `securityContext` (or the CRI refuses to start it). Deleting
-the setuid binaries (above) is the compensating control for keeping
+to the container's `securityContext` (or executing the binary fails with
+EPERM). Deleting the setuid binaries (above) is the compensating control for
+keeping
 `allowPrivilegeEscalation` enabled. The full Kubernetes `securityContext`
 guidance is in [capabilities.md](../capabilities.md).
 
