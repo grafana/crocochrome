@@ -13,7 +13,7 @@ Normally, a process running as non-root wouldn't have the ability to do this. To
 In order for this to be effective, we also need to add those capabilities to the "bounding set". In kubernetes, this is done through the container's `securityContext`. These two different places where we specify capabilities (the binary and the container `securityContext` interact in the following ways:
 - If the capabilities are not specified anywhere, crocochrome will return an error while trying to run chromium as a different user: It has no permissions.
 - If the capabilities are set in the securityContext but not in the binary, the same thing happens. Capabilities added to the securityContext (bounding set) are not granted automatically to any binary inside the container.
-- If the capabilities are set in the binary, but not in the securityContext, the CRI will refuse to even start crocochrome, as it has capabilities that are disallowed in the bounding set.
+- If the capabilities are set in the binary, but not in the securityContext, the container starts, but executing crocochrome fails with `Operation not permitted`, as the binary has capabilities that are not in the bounding set. This happens even if only some of them are missing.
 - If capabilities are set both in the binary and in the securityContext, crocochrome will start and will be able to start, kill and clean up after processes that run as different users.
 
 A third variable is `allowPrivilegeEscalation`. As per the [k8s docs](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/), this enforces the `no_new_privs` flag. This flags is defined in the [linux docs](https://www.kernel.org/doc/Documentation/prctl/no_new_privs.txt), but the relevant part is the following one:
@@ -49,7 +49,7 @@ securityContext:
 
 `/chromium-tmp` must be writable by the user crocochrome runs as. A Kubernetes `emptyDir` volume is.
 
-If the hardened image is run with `allowPrivilegeEscalation: false`, or without the required capabilities, crocochrome refuses to start and logs which capabilities are missing.
+If the hardened image is run without the required capabilities in the securityContext, tini cannot execute crocochrome and logs `exec /usr/local/bin/crocochrome failed: Operation not permitted`. If the capabilities are present but `allowPrivilegeEscalation` is `false`, crocochrome starts, logs which capabilities are missing, and exits. In both cases the container exits with status 1.
 
 ### Choosing an image
 

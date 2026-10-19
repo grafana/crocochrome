@@ -20,7 +20,8 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 
 # The following capabilities are used by crocochrome to run chromium as a different user, and to clean up after it. More
 # details about what each cap is used for can be found in doc/capabilities.md.
-# WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
+# WARNING: The container MUST be also granted all of the following capabilities too, or executing crocochrome will fail
+# with "Operation not permitted".
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
 # Steps shared by the hardened and the unprivileged images.
