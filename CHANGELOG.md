@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.13.2](https://github.com/grafana/crocochrome/compare/v0.13.1...v0.13.2) (2026-10-22)
+
+
+### Fixes
+
+* Distrust compromised eMudhra intermediates in Chromium (CVE-2026-111943) ([#590](https://github.com/grafana/crocochrome/issues/590)) ([5d44a45](https://github.com/grafana/crocochrome/commit/5d44a453c90e90498df565f74727fbc4e6299a4a))
+
+
+### Miscellaneous Chores
+
+* Build with Go 1.26.10 (CVE-2026-111943) ([#589](https://github.com/grafana/crocochrome/issues/589)) ([0693574](https://github.com/grafana/crocochrome/commit/0693574dbf69fdcbbce963dd0f573fe3458a5f2f))
+* Update module github.com/moby/go-archive to v0.3.3 ([#579](https://github.com/grafana/crocochrome/issues/579)) ([5d978fb](https://github.com/grafana/crocochrome/commit/5d978fb34db195d4862c027bf0efef36b0b35a54))
+* Update module github.com/shirou/gopsutil/v4 to v4.26.9 ([#580](https://github.com/grafana/crocochrome/issues/580)) ([f1b5690](https://github.com/grafana/crocochrome/commit/f1b5690176823c8e004f04bd169e076262d70e9c))
+
 ## [0.13.1](https://github.com/grafana/crocochrome/compare/v0.13.0...v0.13.1) (2026-10-01)
 
 
