@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   make GOOS=$TARGETOS GOARCH=$TARGETARCH DISTDIR=/usr/local/bin LOCAL=true build
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:152.0.7977.82-r1-3.24.2@sha256:90f7fbf603a7482689db1d5d996aef895dbb6ddf125df0f204cfb1b3852eb91a AS setcapper
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:155.0.8059.84-r0-3.24.2@sha256:0cb6ab82a71126d01c6db2fb649484bf10c081a86cbf661f752873819f2663ef AS setcapper
 
 RUN apk --no-cache add libcap
 
@@ -23,11 +23,14 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 # WARNING: The container MUST be also granted all of the following capabilities too, or the CRI will refuse to start it.
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:152.0.7977.82-r1-3.24.2@sha256:90f7fbf603a7482689db1d5d996aef895dbb6ddf125df0f204cfb1b3852eb91a
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:155.0.8059.84-r0-3.24.2@sha256:0cb6ab82a71126d01c6db2fb649484bf10c081a86cbf661f752873819f2663ef
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
 RUN apk --no-cache add --repository community tini
+
+# Refresh the CA bundle in case the base image ships an outdated one (CVE-2026-111943).
+RUN apk --no-cache add --upgrade ca-certificates ca-certificates-bundle
 
 # As we rely on file capabilities, we cannot set `allowPrivilegeEscalation: false` in k8s. As a workaround, and to lower
 # potential attack surface, we get rid of any file that has the setuid bit set, such as
