@@ -36,13 +36,14 @@ func main() {
 
 	config := &Config{}
 	flag.StringVar(&config.TempDir, "temp-dir", "/chromium-tmp", "Directory for chromiumium instances to write their data to")
-	flag.IntVar(&config.UserGroup, "user-group", 65534, "Default user to run as. For local development, set this flag to 0")
+	flag.IntVar(&config.UserGroup, "user-group", 65534, "User and group ID to run chromium as. Set to 0 to run chromium as the current user, which does not require any capabilities")
 	flag.BoolVar(&config.EnableProcessMetrics, "process-metrics", false, "Enable per-process RSS collection at session teardown. Adds negligible overhead.")
 
 	flag.Parse()
 	if err := run(logger, config); err != nil {
 		logger.Error("run failed to execute",
 			slog.String("msg", err.Error()))
+		os.Exit(1)
 	}
 }
 
@@ -52,6 +53,12 @@ func run(logger *slog.Logger, config *Config) error {
 		slog.String("commit", version.Commit()),
 		slog.String("timestamp", version.Buildstamp()),
 	)
+
+	if config.UserGroup != 0 {
+		if err := crocochrome.CheckCapabilities("/proc"); err != nil {
+			return err
+		}
+	}
 
 	mux := http.NewServeMux()
 

@@ -88,6 +88,10 @@ shell:
 build-container: ## Build docker container image.
 	$(V) $(docker) build -t $(image) .
 
+.PHONY: build-container-unprivileged
+build-container-unprivileged: ## Build unprivileged docker container image.
+	$(V) $(docker) build --target unprivileged -t $(image)-unprivileged .
+
 ##@ Testing
 
 .PHONY: test
