@@ -92,11 +92,11 @@ build-container: ## Build docker container image.
 
 .PHONY: test
 test: ## Test everything.
-	$(V) $(buildtools) go test -v ./...
+	$(V) $(buildtools) go test -v -race ./...
 
 .PHONY: test-short
 test-short: ## Run short tests only.
-	$(V) $(buildtools) go test -v -short ./...
+	$(V) $(buildtools) go test -v -race -short ./...
 
 .PHONY: test-integration
 test-integration: ## Run integration tests.
