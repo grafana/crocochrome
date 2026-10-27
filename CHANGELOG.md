@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.13.3](https://github.com/grafana/crocochrome/compare/v0.13.2...v0.13.3) (2026-10-26)
+
+
+### Miscellaneous Chores
+
+* Update docker/login-action digest to 81c6f93 ([#606](https://github.com/grafana/crocochrome/issues/606)) ([46d4795](https://github.com/grafana/crocochrome/commit/46d4795c4094166f1083305b1fb433ea3d837149))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v155.0.8059.84-r0-3.24.3 ([#592](https://github.com/grafana/crocochrome/issues/592)) ([7ecbab2](https://github.com/grafana/crocochrome/commit/7ecbab2dc6a27cc5560accd315cafd98c5ade5ba))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v1.49.0 ([#595](https://github.com/grafana/crocochrome/issues/595)) ([620a29d](https://github.com/grafana/crocochrome/commit/620a29dac7e59610307324d50d2d6e6ee4593af7))
+* Update github.com/Azure/go-ansiterm digest to 51075c6 ([#602](https://github.com/grafana/crocochrome/issues/602)) ([d56c809](https://github.com/grafana/crocochrome/commit/d56c8096ff152e805a8d447c921841007d484f05))
+* Update github.com/lufia/plan9stats digest to 341c2f0 ([#603](https://github.com/grafana/crocochrome/issues/603)) ([cf9561c](https://github.com/grafana/crocochrome/commit/cf9561c30e507046c4b3b845155473936bed6e62))
+* Update github.com/power-devops/perfstat digest to 22a1a46 ([#604](https://github.com/grafana/crocochrome/issues/604)) ([849fbb6](https://github.com/grafana/crocochrome/commit/849fbb6d86572c82b0b8cb6b8a022ca73462b12c))
+* Update grafana/k6-v1 Docker tag to v1.8.2 ([#585](https://github.com/grafana/crocochrome/issues/585)) ([7e4e44a](https://github.com/grafana/crocochrome/commit/7e4e44a521b577b9bc7a26575ef21388e9ae8e70))
+* Update module github.com/containerd/log to v0.2.0 ([#582](https://github.com/grafana/crocochrome/issues/582)) ([c40492c](https://github.com/grafana/crocochrome/commit/c40492c42a9f30e5cd624eb36d2eed1e95b2b730))
+* Update module github.com/docker/go-connections to v0.8.2 ([#583](https://github.com/grafana/crocochrome/issues/583)) ([754dfcd](https://github.com/grafana/crocochrome/commit/754dfcdc8a45a78d0dc5fba7d149747e8d5c43ba))
+* Update module github.com/ebitengine/purego to v0.11.2 ([#593](https://github.com/grafana/crocochrome/issues/593)) ([d6cf5c7](https://github.com/grafana/crocochrome/commit/d6cf5c79811bd8e6aec0e47577436bb3455157d1))
+* Update module github.com/ebitengine/purego to v0.11.2 ([#594](https://github.com/grafana/crocochrome/issues/594)) ([ee101cb](https://github.com/grafana/crocochrome/commit/ee101cbf18d346db8bc5f8e095c3ac3f2f783111))
+* Update module github.com/go-logr/logr to v1.4.4 ([#577](https://github.com/grafana/crocochrome/issues/577)) ([faeaa8a](https://github.com/grafana/crocochrome/commit/faeaa8aeb2177147f5941e0631816a9ef65dcd53))
+* Update module github.com/klauspost/compress to v1.20.3 ([#586](https://github.com/grafana/crocochrome/issues/586)) ([3c97e6f](https://github.com/grafana/crocochrome/commit/3c97e6f2c722fd985de48b1010b6ff12777a0f3e))
+* Update module github.com/magiconair/properties to v1.18.12 ([#596](https://github.com/grafana/crocochrome/issues/596)) ([3020a7e](https://github.com/grafana/crocochrome/commit/3020a7ea0676d08e94e5b4c333bcafc5cb8dbbd4))
+* Update module github.com/Microsoft/go-winio to v0.6.4 ([#578](https://github.com/grafana/crocochrome/issues/578)) ([bb670e8](https://github.com/grafana/crocochrome/commit/bb670e8f99b583796f08e29288ebd242675d925e))
+* Update module github.com/moby/moby/api to v1.56.1 ([#574](https://github.com/grafana/crocochrome/issues/574)) ([d4997f1](https://github.com/grafana/crocochrome/commit/d4997f1898c3eb23be6d88823b493107a9434f5f))
+* Update module github.com/moby/moby/client to v0.6.2 ([#597](https://github.com/grafana/crocochrome/issues/597)) ([aa26850](https://github.com/grafana/crocochrome/commit/aa268509cab61e993c7d2981dea13af71114f5d6))
+* Update module github.com/moby/sys/userns to v0.2.1 ([#598](https://github.com/grafana/crocochrome/issues/598)) ([eca8627](https://github.com/grafana/crocochrome/commit/eca8627c65292d75797debd925dc5a34a55b307a))
+* Update module github.com/prometheus/procfs to v0.23.0 ([#605](https://github.com/grafana/crocochrome/issues/605)) ([bb4d271](https://github.com/grafana/crocochrome/commit/bb4d2715aa4d9a49fe05f95683bff702dbbb793d))
+* Update module golang.org/x/crypto to v0.58.0 ([#599](https://github.com/grafana/crocochrome/issues/599)) ([3e772ea](https://github.com/grafana/crocochrome/commit/3e772ea463c5bac9c7667c75d7ff145c918c8e8c))
+* Update module golang.org/x/sync to v0.24.0 ([#575](https://github.com/grafana/crocochrome/issues/575)) ([37e9567](https://github.com/grafana/crocochrome/commit/37e95672fce0a22974fee037362edf30d6c3a2b0))
+* Update module google.golang.org/protobuf to v1.36.12 ([#581](https://github.com/grafana/crocochrome/issues/581)) ([3bfba9e](https://github.com/grafana/crocochrome/commit/3bfba9ed2ce80dfabbb3b3050a0fff6f66061001))
+* Update otel-go ([#600](https://github.com/grafana/crocochrome/issues/600)) ([a2ceac2](https://github.com/grafana/crocochrome/commit/a2ceac2b914184f968a92db8345a8e6618d2752c))
+* Update prometheus-go ([#576](https://github.com/grafana/crocochrome/issues/576)) ([71a4265](https://github.com/grafana/crocochrome/commit/71a4265723467f8518adc3a74c63d844706e4719))
+
 ## [0.13.2](https://github.com/grafana/crocochrome/compare/v0.13.1...v0.13.2) (2026-10-22)
 
 
