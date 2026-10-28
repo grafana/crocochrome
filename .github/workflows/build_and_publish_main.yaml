@@ -1,0 +1,107 @@
+name: Build and publish commit to dev
+
+# Every commit to main is built, pushed to ghcr.io and rolled out to the dev
+# waves through the deploy-crocochrome Argo workflow (synthetic-monitoring-cd).
+#
+# Releases are NOT handled here: v* tags are published by publish-container.yaml
+# and promoted to prod by the crocochrome rollout-by-wave workflow.
+
+permissions:
+  contents: none
+
+on:
+  push:
+    branches:
+      - main
+
+# Only the latest commit matters for dev. Cancel in-flight runs so a burst of
+# merges doesn't queue a deploy for every intermediate commit.
+concurrency:
+  group: build-and-publish-main
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.repo.outputs.version }}
+      image: ${{ steps.repo.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # Needed for the version script to work.
+          persist-credentials: false
+
+      # The version looks like v0.13.2-5-gabc1234 (git describe), which is what
+      # the binary reports in sm_crocochrome_info, so the rollout check in
+      # deploy-crocochrome can match on it.
+      - name: Compute repo metadata
+        id: repo
+        run: |-
+          version="$(./scripts/version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY}:${version}" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        with:
+          cache-binary: false # https://woodruffw.github.io/zizmor/audits/#cache-poisoning
+      - name: Log into ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: . # Use checked out repo with full history, instead of letting build making a shallow clone.
+          tags: |-
+            ${{ steps.repo.outputs.image }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+
+  deploy:
+    name: deploy
+    needs:
+      - publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # The following two steps are needed because trigger-argo-workflow is
+      # calling setup-go *after* setup-argo, and setup-argo actually needs go
+      # to obtain GOOS and GOARCH (because it's downloading a remote tarball
+      # where those values are part of the filename).
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ./go.mod
+
+      - name: Trigger argo workflow
+        uses: grafana/shared-workflows/actions/trigger-argo-workflow@ecdca383418cd7662e5e96f6297c72c98d52916f # trigger-argo-workflow/v1.1.1
+        with:
+          namespace: synthetic-monitoring-cd
+          workflow_template: deploy-crocochrome
+          extra_args: "--generate-name deploy-crocochrome-"
+          parameters: |
+            image=${{ needs.publish.outputs.image }}
+            dockertag=${{ needs.publish.outputs.version }}
+            commit=${{ github.sha }}
+            commit_author=${{ github.actor }}
+            commit_link=${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
