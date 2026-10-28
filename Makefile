@@ -3,6 +3,12 @@ DISTDIR        := $(ROOTDIR)/dist
 GO_MODULE_NAME := $(shell go list -m)
 GH_REPO_NAME   := $(GO_MODULE_NAME:github.com/%=%)
 
+# VERSION is embedded in the binary and reported by it (see internal/version). It is the same string used to tag the
+# container image. It is only used if it is derived from a tag (vX.Y.Z...): in a checkout without tags, such as a
+# shallow clone, scripts/version falls back to the bare commit hash, which is not a valid version. In that case VERSION
+# stays empty and the binary falls back to Go's own module version.
+VERSION ?= $(shell $(ROOTDIR)/scripts/version 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+')
+
 export GOOS
 export GOARCH
 
@@ -74,7 +80,7 @@ all:
 .PHONY: build
 all: build
 build: ## Build everything.
-	$(V) $(buildtools) env CGO_ENABLED=0 go build -o '$(DISTDIR)/crocochrome' ./cmd/crocochrome/
+	$(V) $(buildtools) env CGO_ENABLED=0 go build -ldflags "-X $(GO_MODULE_NAME)/internal/version.version=$(VERSION)" -o '$(DISTDIR)/crocochrome' ./cmd/crocochrome/
 
 # Provide an easy way to enter the same environment for debugging purposes.
 #
