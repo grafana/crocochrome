@@ -12,7 +12,24 @@ const (
 	timeKey     = "vcs.time"
 )
 
+// version is set at build time with -ldflags "-X github.com/grafana/crocochrome/internal/version.version=...", see the
+// Makefile. It holds the output of scripts/version, which is also used as the image tag, so the version reported by
+// the binary and the image tag are always the same string.
+//
+// Go's own main module version cannot be used for this: on an untagged commit it is a pseudo-version
+// (v0.13.4-0.20261028143447-5541944d06b2), while scripts/version gives `git describe` output (v0.13.3-1-g5541944).
+// On a tagged commit both are the tag.
+//
+//nolint:gochecknoglobals // This variable is only written by the linker.
+var version string
+
+// Short returns the version injected at build time, or the version of the main module if none was injected (for
+// example when building with a plain `go build` or `go install`).
 func Short() string {
+	if version != "" {
+		return version
+	}
+
 	bi := getBuildInfo()
 
 	return bi.Main.Version
