@@ -500,7 +500,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 	t.Run("enriches session logger with allowed metadata", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
+		var buf syncBuffer
 		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 		hb := testutil.NewHeartbeat(t)
@@ -622,7 +622,7 @@ sm_crocochrome_chromium_oom_kills_total 1
 	t.Run("logs per-process metrics and session summary on Delete", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
+		var buf syncBuffer
 		logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 		hb := testutil.NewHeartbeat(t)
@@ -703,4 +703,26 @@ sm_crocochrome_session_active %g
 		"sm_crocochrome_session_active"); err != nil {
 		t.Errorf("session active gauge mismatch: %v", err)
 	}
+}
+
+// syncBuffer is a bytes.Buffer safe for concurrent use. The supervisor logs from goroutines that may outlive Wait, such
+// as the context.AfterFunc callback registered for each session, so tests must not read a plain bytes.Buffer while
+// those goroutines may still write to it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
 }
