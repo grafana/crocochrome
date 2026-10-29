@@ -179,3 +179,52 @@ func collectProcessMetrics(cgroupEventsPath, procRoot string) (processes []proce
 
 	return processes, cgroupRSS, nil
 }
+
+// requiredCapabilities are the capabilities crocochrome needs to run chromium as a different user, and to clean up
+// after it. Bit numbers are taken from include/uapi/linux/capability.h.
+var requiredCapabilities = []struct {
+	name string
+	bit  uint
+}{
+	{"CAP_CHOWN", 0},
+	{"CAP_DAC_OVERRIDE", 1},
+	{"CAP_FOWNER", 3},
+	{"CAP_KILL", 5},
+	{"CAP_SETGID", 6},
+	{"CAP_SETUID", 7},
+}
+
+// CheckCapabilities returns an error naming the required capabilities missing from the effective set of the current
+// process, as reported by <procRoot>/self/status.
+func CheckCapabilities(procRoot string) error {
+	fs, err := procfs.NewFS(procRoot)
+	if err != nil {
+		return fmt.Errorf("opening procfs at %q: %w", procRoot, err)
+	}
+
+	p, err := fs.Self()
+	if err != nil {
+		return err
+	}
+
+	st, err := p.NewStatus()
+	if err != nil {
+		return err
+	}
+
+	var missing []string
+	for _, c := range requiredCapabilities {
+		if st.CapEff&(1<<c.bit) == 0 {
+			missing = append(missing, c.name)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf(
+			"missing capabilities %s, which are required to run chromium as a different user; see doc/capabilities.md",
+			strings.Join(missing, ", "),
+		)
+	}
+
+	return nil
+}

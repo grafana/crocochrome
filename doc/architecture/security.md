@@ -69,8 +69,12 @@ Crocochrome needs a few privileged operations even though it runs as non-root:
   `syscall.SysProcAttr.Credential` to run the browser as another UID/GID
   (`nobody`, UID 65534 by default), which needs `cap_setuid` / `cap_setgid`.
 - **Kill** the Chromium process tree on teardown/timeout (`cap_kill`).
-- **Set up sandbox files** for sm-k6-runner (`cap_chown`, `cap_dac_override`,
-  `cap_fowner`).
+- **Hand over and clean up** the per-session temporary directory: `chown` it
+  to the Chromium user (`cap_chown`), and remove it, along with everything
+  Chromium wrote to it, after the session (`cap_dac_override`, `cap_fowner`).
+
+Together, these operations form crocochrome's own sandbox around Chromium,
+standing in for Chromium's disabled one.
 
 These capabilities are granted to the **binary** via `setcap ...+ep` in the
 Dockerfile.
@@ -81,10 +85,34 @@ File capabilities and Kubernetes' recommended `allowPrivilegeEscalation: false`
 are **mutually incompatible**: setting it to `false` enables `no_new_privs`,
 which strips file capabilities. So Crocochrome **must not** set
 `allowPrivilegeEscalation: false`, and the same capabilities must _also_ be added
-to the container's `securityContext` (or the CRI refuses to start it). Deleting
-the setuid binaries (above) is the compensating control for keeping
+to the container's `securityContext` (or executing the binary fails with
+EPERM). Deleting the setuid binaries (above) is the compensating control for
+keeping
 `allowPrivilegeEscalation` enabled. The full Kubernetes `securityContext`
 guidance is in [capabilities.md](../capabilities.md).
+
+### The unprivileged image
+
+The unprivileged image (Dockerfile target `unprivileged`, tag
+`<version>-unprivileged`) trades the user boundary for a container that needs
+no capabilities and runs with `allowPrivilegeEscalation: false`. Its binary
+has no file capabilities, is owned by root with mode `0555` (runnable by any
+UID), and runs Chromium as its own user (`-user-group=0`).
+
+Residual risks, compared to the hardened image, if Chromium is compromised:
+
+- It can signal or kill crocochrome, a pod-level denial of service that
+  Kubernetes recovers from by restarting the pod.
+- It can `ptrace` crocochrome, unless Yama (`ptrace_scope=1`) or seccomp
+  prevent it.
+- It can write to `/chromium-tmp` outside its session directory, and those
+  files persist into later sessions on the same pod.
+- It can leave files in its session directory that crocochrome, lacking
+  `cap_dac_override`, cannot remove. Crocochrome then panics and the pod
+  restarts, which is no worse than the first point.
+
+See [capabilities.md](../capabilities.md#choosing-an-image) for guidance on
+choosing an image.
 
 ## Network boundaries & trust zones
 

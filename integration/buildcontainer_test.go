@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-// buildImage builds the container image for this repo by running `docker` commands, generating an image on the
-// host with the supplied name. Dockerfile is assumed to be placed in repoRoot.
+// buildImage builds the given target of the container image for this repo by running `docker` commands, generating an
+// image on the host with the supplied name. Dockerfile is assumed to be placed in repoRoot.
 // If name does not contain a tag, buildImage will generate a random one instead of defaulting to `latest`. This
 // allows buildImage to be called in parallel tests.
 // buildImage returns the full tag used to build the image, or any error encountered launching the docker command.
@@ -23,7 +23,7 @@ import (
 //
 // https://github.com/testcontainers/testcontainers-go/discussions/573
 // https://github.com/testcontainers/testcontainers-java/issues/2857
-func buildImage(repoRoot, name string) (string, error) {
+func buildImage(repoRoot, name, target string) (string, error) {
 	if !strings.Contains(name, ":") {
 		name = name + ":" + randomHexString(8)
 	}
@@ -31,6 +31,7 @@ func buildImage(repoRoot, name string) (string, error) {
 	dockerArgs := []string{
 		"build",
 		"-t", name,
+		"--target", target,
 		repoRoot,
 	}
 
