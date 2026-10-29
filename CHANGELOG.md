@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/grafana/crocochrome/compare/v0.13.3...v0.14.0) (2026-10-29)
+
+
+### Features
+
+* Add unprivileged image ([#587](https://github.com/grafana/crocochrome/issues/587)) ([6995a09](https://github.com/grafana/crocochrome/commit/6995a094129f3a416148f4da9ff8151b67c55f9d))
+* **ci:** implement triggering CD on main ([#607](https://github.com/grafana/crocochrome/issues/607)) ([36c7d76](https://github.com/grafana/crocochrome/commit/36c7d7614500f8c55810cd3f35ea1c9424c70c4f))
+
+
+### Fixes
+
+* **tests:** Guard log buffers against concurrent writes ([#588](https://github.com/grafana/crocochrome/issues/588)) ([bf2fcf4](https://github.com/grafana/crocochrome/commit/bf2fcf41c238b1c7a75b8ca9570eb47cf912b9f5))
+
 ## [0.13.3](https://github.com/grafana/crocochrome/compare/v0.13.2...v0.13.3) (2026-10-26)
 
 
