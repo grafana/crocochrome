@@ -25,6 +25,25 @@ const terminatedMetricHeader = `# HELP sm_crocochrome_sessions_terminated_total 
 # TYPE sm_crocochrome_sessions_terminated_total counter
 `
 
+// reapOnCleanup deletes any session still alive when the test ends and waits
+// for its process to be reaped. Without it, a heartbeat script left running
+// can recreate files in its directory while t.TempDir's cleanup is removing
+// it, which fails the test with "directory not empty".
+//
+// It must be called after testutil.NewHeartbeat, so it runs before the
+// temporary directory is removed (cleanups run in LIFO order).
+func reapOnCleanup(t *testing.T, cc *crocochrome.Supervisor) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		for _, id := range cc.Sessions() {
+			cc.Delete(id)
+		}
+
+		cc.Wait()
+	})
+}
+
 func TestCrocochrome(t *testing.T) {
 	t.Parallel()
 
@@ -40,6 +59,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		session, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -80,6 +100,7 @@ func TestCrocochrome(t *testing.T) {
 			hb := testutil.NewHeartbeat(t)
 			port := testutil.HTTPInfo(t, testutil.InternalServerErrorHandler)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+			reapOnCleanup(t, cc)
 
 			_, err := cc.Create(crocochrome.CheckInfo{})
 			if err == nil {
@@ -94,6 +115,7 @@ func TestCrocochrome(t *testing.T) {
 
 			hb := testutil.NewHeartbeat(t)
 			cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: "0"})
+			reapOnCleanup(t, cc)
 
 			_, err := cc.Create(crocochrome.CheckInfo{})
 			if err == nil {
@@ -110,6 +132,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		sess, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -133,6 +156,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		sess1, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -161,6 +185,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		session, err := cc.CreateIfFree(crocochrome.CheckInfo{})
 		if err != nil {
@@ -180,6 +205,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		sess1, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -206,6 +232,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		sess, err := cc.CreateIfFree(crocochrome.CheckInfo{})
 		if err != nil {
@@ -230,6 +257,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		const concurrency = 10
 
@@ -273,6 +301,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		sess, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -306,6 +335,7 @@ func TestCrocochrome(t *testing.T) {
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		// Create reads s.draining under sessionsMtx and Drain writes it under the same lock. Racing them
 		// exercises the shutdown ordering and lets `go test -race` flag any future change that drops the
@@ -352,6 +382,7 @@ func TestCrocochrome(t *testing.T) {
 
 		reg := prometheus.NewRegistry()
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+		reapOnCleanup(t, cc)
 
 		assertSessionActive(t, reg, 0)
 
@@ -388,6 +419,7 @@ func TestCrocochrome(t *testing.T) {
 			SessionTimeout: 3 * time.Second,
 			Registry:       reg,
 		})
+		reapOnCleanup(t, cc)
 
 		_, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -409,6 +441,7 @@ func TestCrocochrome(t *testing.T) {
 
 		reg := prometheus.NewRegistry()
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, Registry: reg})
+		reapOnCleanup(t, cc)
 
 		if _, err := cc.Create(crocochrome.CheckInfo{}); err != nil {
 			t.Fatalf("creating session: %v", err)
@@ -453,6 +486,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 			SessionTimeout: 3 * time.Second,
 			Registry:       reg,
 		})
+		reapOnCleanup(t, cc)
 
 		_, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -490,6 +524,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		_, err := cc.Create(crocochrome.CheckInfo{Metadata: nil})
 		if err != nil {
@@ -506,6 +541,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port})
+		reapOnCleanup(t, cc)
 
 		// Keys match what synthetic-monitoring-agent sends via sm-k6-runner.
 		sess, err := cc.Create(crocochrome.CheckInfo{
@@ -547,6 +583,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 		hb := testutil.NewHeartbeat(t)
 		port := testutil.HTTPInfo(t, testutil.ChromiumVersionHandler)
 		cc := crocochrome.New(logger, crocochrome.Options{ChromiumPath: hb.Path, ChromiumPort: port, SessionTimeout: 3 * time.Second})
+		reapOnCleanup(t, cc)
 
 		_, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -586,6 +623,7 @@ sm_crocochrome_sessions_terminated_total{reason="replaced"} 1
 				Registry:               reg,
 			},
 		)
+		reapOnCleanup(t, cc)
 
 		sess, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
@@ -657,6 +695,7 @@ sm_crocochrome_chromium_oom_kills_total 1
 			CgroupMemoryEventsPath: eventsPath,
 			ProcFSRoot:             procRoot,
 		})
+		reapOnCleanup(t, cc)
 
 		sess, err := cc.Create(crocochrome.CheckInfo{})
 		if err != nil {
