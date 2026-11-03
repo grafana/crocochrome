@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.14.0](https://github.com/grafana/crocochrome/compare/v0.13.3...v0.14.0) (2026-11-03)
+
+
+### Features
+
+* Add unprivileged image ([#587](https://github.com/grafana/crocochrome/issues/587)) ([6995a09](https://github.com/grafana/crocochrome/commit/6995a094129f3a416148f4da9ff8151b67c55f9d))
+* **ci:** implement triggering CD on main ([#607](https://github.com/grafana/crocochrome/issues/607)) ([36c7d76](https://github.com/grafana/crocochrome/commit/36c7d7614500f8c55810cd3f35ea1c9424c70c4f))
+
+
+### Fixes
+
+* Cleanup TempDir in supervisor tests ([#615](https://github.com/grafana/crocochrome/issues/615)) ([5ad9de7](https://github.com/grafana/crocochrome/commit/5ad9de7ca3ca6fff3e03a0cc5d3a76e8a36db990))
+* **tests:** Guard log buffers against concurrent writes ([#588](https://github.com/grafana/crocochrome/issues/588)) ([bf2fcf4](https://github.com/grafana/crocochrome/commit/bf2fcf41c238b1c7a75b8ca9570eb47cf912b9f5))
+
+
+### Miscellaneous Chores
+
+* Update ghcr.io/grafana/chromium-swiftshader-alpine:155.0.8059.84-r0-3.24.3 Docker digest to 2c01a3e ([#611](https://github.com/grafana/crocochrome/issues/611)) ([e0245da](https://github.com/grafana/crocochrome/commit/e0245dae9ad5ddd5f42c73b23e745aebdf42bb6c))
+* Update ghcr.io/grafana/grafana-build-tools Docker tag to v2 ([#616](https://github.com/grafana/crocochrome/issues/616)) ([8753a36](https://github.com/grafana/crocochrome/commit/8753a36c405bbd186a0c6fcfc3b94aafa3c84182))
+* Update module github.com/prometheus/common to v0.73.1 ([#612](https://github.com/grafana/crocochrome/issues/612)) ([0a6f61f](https://github.com/grafana/crocochrome/commit/0a6f61fef452129a5d5d4cac60a6ec7e50720eab))
+* Update module go.yaml.in/yaml/v3 to v3.0.6 ([#614](https://github.com/grafana/crocochrome/issues/614)) ([07ef9fa](https://github.com/grafana/crocochrome/commit/07ef9fa85a8e41ded317cde759482700ec66d01c))
+
 ## [0.13.3](https://github.com/grafana/crocochrome/compare/v0.13.2...v0.13.3) (2026-10-26)
 
 
