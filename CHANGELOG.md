@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/grafana/crocochrome/compare/v0.14.0...v0.14.1) (2026-11-04)
+
+
+### Fixes
+
+* disable AvoidCorsURLLoaderRestartOnRedirect ([#618](https://github.com/grafana/crocochrome/issues/618)) ([4bf3859](https://github.com/grafana/crocochrome/commit/4bf385942d0ec05238d7b00b909c88fe29f8c497))
+
 ## [0.14.0](https://github.com/grafana/crocochrome/compare/v0.13.3...v0.14.0) (2026-11-03)
 
 
