@@ -496,7 +496,15 @@ func (s *Supervisor) launch(ctx context.Context, logger *slog.Logger, oomBefore 
 		// unconditionally create and fully render their own WebContents on every browser launch,
 		// even in --headless mode where they're never shown. Both were enabled by default together
 		// in the same upstream change (https://chromium-review.googlesource.com/c/chromium/src/+/8092074).
-		"--disable-features=WebUIOmniboxPopup,WebUIOmniboxAimPopup",
+		//
+		// AvoidCorsURLLoaderRestartOnRedirect, on by default since Chromium 155, breaks redirects while
+		// DevTools Fetch interception is enabled, which k6 does to enforce its IP and hostname blocklists.
+		// A same-origin request redirected cross-origin then reaches the new origin without a valid Origin
+		// header and fails CORS (https://issues.chromium.org/issues/568822839,
+		// https://github.com/microsoft/playwright/pull/43249).
+		//
+		// Keep all disabled features in this single switch, as Chromium may honor only one --disable-features.
+		"--disable-features=WebUIOmniboxPopup,WebUIOmniboxAimPopup,AvoidCorsURLLoaderRestartOnRedirect",
 	}
 
 	if s.userAgent != "" {

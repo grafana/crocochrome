@@ -233,7 +233,7 @@ to be necessary; the rest are believed beneficial but unproven.
 | `--disable-default-apps`                                                                             | no first-run app installation                                                                                 |
 | `--disable-extensions`, `--disable-file-system`, `--disable-first-run-ui`, `--disable-notifications` | reduce surface/noise                                                                                          |
 | `--disable-smooth-scrolling`                                                                         | save CPU                                                                                                      |
-| `--disable-features=WebUIOmniboxPopup,WebUIOmniboxAimPopup`                                          | Chrome's WebUI omnibox popup and its AI Mode variant render a full WebContents on every launch even under `--headless`; disabling avoids that CPU cost |
+| `--disable-features=WebUIOmniboxPopup,WebUIOmniboxAimPopup,AvoidCorsURLLoaderRestartOnRedirect`      | Chrome's WebUI omnibox popup and its AI Mode variant render a full WebContents on every launch even under `--headless`; disabling avoids that CPU cost. `AvoidCorsURLLoaderRestartOnRedirect` (Chromium 155+) makes CORS redirects fail while DevTools Fetch interception is on, which k6 enables for its blocklists ([issue 568822839](https://issues.chromium.org/issues/568822839)). Keep all features in one switch, as Chromium may honor only one |
 | `--user-agent=<patched UA>`                                                                          | only added when a patched UA has been computed                                                                |
 
 ### Dropping privileges
