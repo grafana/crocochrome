@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   make GOOS=$TARGETOS GOARCH=$TARGETARCH DISTDIR=/usr/local/bin LOCAL=true build
 
 # For setting caps, use the same image than the final layer is using to avoid pulling two distinct ones.
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:155.0.8059.84-r0-3.24.3@sha256:2c01a3e673c206c30130c37cf30709512fd050205bf60fa605b2398d90c74d84 AS setcapper
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:156.0.8078.79-r0-3.24.3@sha256:60ff03263ad63aa24faccb90b9534a93d5911992fed9d42cdb721c0649d3122e AS setcapper
 
 RUN apk --no-cache add libcap
 
@@ -25,7 +25,7 @@ COPY --from=buildtools /usr/local/bin/crocochrome /usr/local/bin/crocochrome
 RUN setcap cap_setuid,cap_setgid,cap_kill,cap_chown,cap_dac_override,cap_fowner+ep /usr/local/bin/crocochrome
 
 # Steps shared by the hardened and the unprivileged images.
-FROM ghcr.io/grafana/chromium-swiftshader-alpine:155.0.8059.84-r0-3.24.3@sha256:2c01a3e673c206c30130c37cf30709512fd050205bf60fa605b2398d90c74d84 AS base
+FROM ghcr.io/grafana/chromium-swiftshader-alpine:156.0.8078.79-r0-3.24.3@sha256:60ff03263ad63aa24faccb90b9534a93d5911992fed9d42cdb721c0649d3122e AS base
 
 RUN adduser --home / --uid 6666 --shell /bin/nologin --disabled-password k6
 
