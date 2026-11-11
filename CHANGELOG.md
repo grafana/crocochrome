@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.2](https://github.com/grafana/crocochrome/compare/v0.14.1...v0.14.2) (2026-11-11)
+
+
+### Miscellaneous Chores
+
+* **deps:** update grafana/shared-workflows/trigger-argo-workflow action to v2.0 ([#609](https://github.com/grafana/crocochrome/issues/609)) ([c5cc4f4](https://github.com/grafana/crocochrome/commit/c5cc4f4d212b890270cd2d715d6defed5c8732fc))
+* Update docker/login-action digest to 8aa5831 ([#620](https://github.com/grafana/crocochrome/issues/620)) ([fd470ce](https://github.com/grafana/crocochrome/commit/fd470cebf744ca2bd4c9431550b84ad074eb0c7d))
+* Update ghcr.io/grafana/chromium-swiftshader-alpine Docker tag to v156 ([#623](https://github.com/grafana/crocochrome/issues/623)) ([c00523d](https://github.com/grafana/crocochrome/commit/c00523dbdf1f07e95811b855b923e1d9051c03e0))
+* Update module github.com/testcontainers/testcontainers-go to v0.45.0 ([#621](https://github.com/grafana/crocochrome/issues/621)) ([7fcf8c4](https://github.com/grafana/crocochrome/commit/7fcf8c44e6efa74a36f6a496a94a2b534ffc77eb))
+* Update module golang.org/x/crypto to v0.59.0 [SECURITY] ([#625](https://github.com/grafana/crocochrome/issues/625)) ([eaecd89](https://github.com/grafana/crocochrome/commit/eaecd8903601aff01f95122db54bfd4fd8d3f8d1))
+* Update module golang.org/x/sync to v0.25.0 ([#622](https://github.com/grafana/crocochrome/issues/622)) ([fa1171d](https://github.com/grafana/crocochrome/commit/fa1171d0efcbd2b8d6c4043d9c4fe7749cc652aa))
+
 ## [0.14.1](https://github.com/grafana/crocochrome/compare/v0.14.0...v0.14.1) (2026-11-04)
 
 
