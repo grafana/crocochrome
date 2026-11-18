@@ -28,7 +28,7 @@ const (
 	// Renovate updates the images below.
 	// Keep the format as it is or update the renovate config with it.
 	k6V1ImageVersion = "grafana/k6:1.8.3"
-	k6V2ImageVersion = "grafana/k6:2.3.0"
+	k6V2ImageVersion = "grafana/k6:2.4.0"
 )
 
 // hardenedCapabilities are the capabilities the crocochrome binary requires, as documented in doc/capabilities.md.
